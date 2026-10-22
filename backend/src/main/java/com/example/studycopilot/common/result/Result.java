@@ -10,8 +10,13 @@ package com.example.studycopilot.common.result;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.example.studycopilot.common.errorcode.ScErrorCode;
+import org.slf4j.MDC;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 统一接口返回结果。
@@ -20,6 +25,7 @@ import java.io.Serializable;
  */
 @Data
 @Accessors(chain = true)
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class Result<T> implements Serializable {
 
     public static final String SUCCESS_CODE = "0";
@@ -32,8 +38,26 @@ public class Result<T> implements Serializable {
     /** 业务数据 */
     private T data;
     /** 请求唯一标识 */
-    private String requestId;
+    private String traceId = MDC.get("traceId");
+    private boolean retryable;
+    private List<FieldViolation> fieldErrors = List.of();
+    private Long currentVersion;
+    private Object currentSession;
 
+    /** Source-compatible alias; the wire contract exposes traceId only. */
+    @Deprecated
+    @JsonIgnore
+    public String getRequestId() {
+        return traceId;
+    }
+
+    @Deprecated
+    public Result<T> setRequestId(String requestId) {
+        this.traceId = requestId;
+        return this;
+    }
+
+    @JsonIgnore
     public boolean isSuccess() {
         return SUCCESS_CODE.equals(code);
     }
@@ -69,6 +93,9 @@ public class Result<T> implements Serializable {
         Result<T> result = new Result<>();
         result.setCode(errorCode.code());
         result.setMessage(errorCode.message());
+        if (errorCode instanceof ScErrorCode scErrorCode) {
+            result.setRetryable(scErrorCode.retryable());
+        }
         return result;
     }
 }

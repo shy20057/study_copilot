@@ -17,11 +17,23 @@ import lombok.Getter;
 @Getter
 public class BusinessException extends AbstractException {
 
+    private final Long currentVersion;
+    private final Object currentSession;
+
     public BusinessException(String errorCode, String errorMessage) {
         super(errorCode, errorMessage);
+        this.currentVersion = null;
+        this.currentSession = null;
     }
 
     public BusinessException(IErrorCode errorCode) {
+        this(errorCode, null, null);
+    }
+
+    /** Context must be an authorized public DTO, never a persistence entity. */
+    public BusinessException(IErrorCode errorCode, Long currentVersion, Object currentSession) {
         super(errorCode);
+        this.currentVersion = currentVersion;
+        this.currentSession = currentSession;
     }
 }
