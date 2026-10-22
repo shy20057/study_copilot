@@ -3,14 +3,12 @@ server:
 spring:
   application:
     name: study-copilot-service
-  profiles:
-    default: dev
   main:
     allow-bean-definition-overriding: false
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/study_copilot?currentSchema=study_copilot}
-    username: ${POSTGRES_USER:study_copilot}
-    password: ${POSTGRES_PASSWORD:change-me-postgres}
+    url: ${SC_DB_URL}
+    username: ${SC_DB_USER}
+    password: ${SC_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   flyway:
     schemas: study_copilot
@@ -19,13 +17,14 @@ spring:
     locations: classpath:db/migration
   data:
     redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6381}
-      password: ${REDIS_PASSWORD:change-me-redis}
+      host: ${SC_REDIS_HOST:127.0.0.1}
+      port: ${SC_REDIS_PORT:6381}
+      password: ${SC_REDIS_PASSWORD}
       timeout: 3s
   cache:
     redis:
       time-to-live: 10m
+      key-prefix: "${SC_REDIS_PREFIX:study-copilot:}cache:"
   servlet:
     multipart:
       max-file-size: 5MB
@@ -36,7 +35,6 @@ mybatis-plus:
   type-aliases-package: com.example.studycopilot.dao.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       id-type: auto
@@ -46,7 +44,7 @@ mybatis-plus:
 
 jwt:
   issuer: ${JWT_ISSUER:study-copilot}
-  secret: ${JWT_SECRET:replace-with-at-least-32-random-bytes}
+  secret: ${SC_JWT_SECRET}
   access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:7200}
   refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:604800}
 
@@ -57,4 +55,12 @@ management:
         include: health,info,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
+
+study-copilot:
+  redis-key-prefix: "${SC_REDIS_PREFIX:study-copilot:}"
+  storage:
+    endpoint: ${SC_MINIO_ENDPOINT:http://127.0.0.1:9000}
+    bucket: ${SC_MINIO_BUCKET:study-copilot}
+    access-key: ${SC_MINIO_ACCESS_KEY}
+    secret-key: ${SC_MINIO_SECRET_KEY}

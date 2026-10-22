@@ -15,6 +15,7 @@ import com.example.studycopilot.dto.resp.mistake.MistakeResponse;
 import com.example.studycopilot.service.mistake.MistakeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +32,7 @@ import java.util.List;
  * 错题接口控制器。
  */
 @RestController
+@Profile("future-features")
 @RequestMapping("/api/mistakes")
 @RequiredArgsConstructor
 public class MistakeController {

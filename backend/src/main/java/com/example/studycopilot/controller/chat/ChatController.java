@@ -11,6 +11,7 @@ package com.example.studycopilot.controller.chat;
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.service.chat.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * AI对话接口控制器。
  */
 @RestController
+@Profile("future-features")
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
 public class ChatController {

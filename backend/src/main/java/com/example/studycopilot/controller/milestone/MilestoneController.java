@@ -15,6 +15,7 @@ import com.example.studycopilot.dto.resp.milestone.MilestoneResponse;
 import com.example.studycopilot.service.milestone.MilestoneService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +32,7 @@ import java.util.List;
  * 阶段接口控制器。
  */
 @RestController
+@Profile("future-features")
 @RequestMapping("/api/milestones")
 @RequiredArgsConstructor
 public class MilestoneController {

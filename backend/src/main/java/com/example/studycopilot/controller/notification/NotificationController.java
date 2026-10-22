@@ -11,6 +11,7 @@ package com.example.studycopilot.controller.notification;
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 通知接口控制器。
  */
 @RestController
+@Profile("future-features")
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 public class NotificationController {

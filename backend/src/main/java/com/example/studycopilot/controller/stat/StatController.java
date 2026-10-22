@@ -12,6 +12,7 @@ import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.dto.resp.stat.StatSummaryResponse;
 import com.example.studycopilot.service.stat.StatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
  * 统计接口控制器。
  */
 @RestController
+@Profile("future-features")
 @RequestMapping("/api/analytics")
 @RequiredArgsConstructor
 public class StatController {

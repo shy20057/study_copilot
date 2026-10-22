@@ -10,10 +10,13 @@
 
   <properties>
     <java.version>17</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <lombok.version>1.18.36</lombok.version>
-    <spring-boot.version>3.0.7</spring-boot.version>
+    <spring-boot.version>3.3.4</spring-boot.version>
     <mybatis-plus.version>3.5.5</mybatis-plus.version>
     <jjwt.version>0.11.5</jjwt.version>
+    <minio.version>8.5.17</minio.version>
+    <maven-surefire.version>3.2.5</maven-surefire.version>
   </properties>
 
   <dependencyManagement>
@@ -51,6 +54,7 @@
 
     <!-- Database -->
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
     <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
 
     <!-- MyBatis-Plus -->
@@ -59,12 +63,21 @@
     <!-- Lombok -->
     <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></dependency>
 
+    <!-- Avatar object storage (configured lazily by the avatar module) -->
+    <dependency><groupId>io.minio</groupId><artifactId>minio</artifactId><version>${minio.version}</version></dependency>
+
     <!-- Test -->
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven-surefire.version}</version>
+      </plugin>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>

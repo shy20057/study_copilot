@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: ${SC_TEST_DB_URL}
+    username: ${SC_TEST_DB_USER}
+    password: ${SC_TEST_DB_PASSWORD}
+  data:
+    redis:
+      password: ${SC_REDIS_PASSWORD:}
+  cache:
+    redis:
+      key-prefix: "study-copilot:test:cache:"
+  flyway:
+    clean-disabled: true
+  main:
+    banner-mode: "off"
+  jmx:
+    enabled: false
+logging:
+  level:
+    root: WARN
+    org.flywaydb: INFO
+jwt:
+  secret: ${SC_TEST_JWT_SECRET:test-only-signing-key-not-used-outside-test-profile}
+study-copilot:
+  redis-key-prefix: "study-copilot:test:"
