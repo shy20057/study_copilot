@@ -48,6 +48,7 @@ The default runtime has no embedded credentials. Supply the following variables 
 | `SC_REDIS_HOST`, `SC_REDIS_PORT`, `SC_REDIS_PASSWORD` | Existing Redis connection; host/port default to `127.0.0.1:6381` |
 | `SC_REDIS_PREFIX` | Runtime namespace; default `study-copilot:` |
 | `SC_JWT_SECRET` | Random JWT signing secret with at least 32 UTF-8 bytes |
+| `SC_RECOVERY_SUPPORT_CHANNEL` | Human support channel for invited-beta account recovery; required outside tests |
 | `SC_MINIO_ENDPOINT` | Existing MinIO API endpoint; default `http://127.0.0.1:9000` |
 | `SC_MINIO_BUCKET` | Separate avatar bucket; default `study-copilot` |
 | `SC_MINIO_ACCESS_KEY`, `SC_MINIO_SECRET_KEY` | Credentials scoped to that avatar bucket |

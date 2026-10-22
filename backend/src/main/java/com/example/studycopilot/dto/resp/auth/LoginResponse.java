@@ -8,12 +8,13 @@
  */
 package com.example.studycopilot.dto.resp.auth;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 登录响应。
  */
-@Data
+@Getter @Setter
 public class LoginResponse {
 
     /** Access Token */
@@ -27,4 +28,6 @@ public class LoginResponse {
 
     /** 用户名 */
     private String username;
+
+    private String nextRoute;
 }

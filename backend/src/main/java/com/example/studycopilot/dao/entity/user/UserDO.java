@@ -28,6 +28,12 @@ public class UserDO {
     /** 用户名 */
     private String username;
 
+    private String normalizedUsername;
+    private Long sessionVersion;
+    private Integer deleted;
+    private Instant deletedAt;
+    private String nickname;
+
     /** BCrypt 加密密码 */
     private String password;
 

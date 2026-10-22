@@ -22,6 +22,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import com.example.studycopilot.common.exception.BusinessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * JWT 认证过滤器。
@@ -31,17 +33,31 @@ import java.util.Collections;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final JdbcTemplate jdbc;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             String token = bearerToken.substring(7);
-            if (jwtTokenProvider.validateToken(token)) {
-                Long userId = jwtTokenProvider.parseUserId(token);
+            try {
+                var claims = jwtTokenProvider.parseAccess(token);
+                Long userId = Long.valueOf(claims.getSubject());
+                Long version = ((Number) claims.get("sessionVersion")).longValue();
+                boolean active = Boolean.TRUE.equals(jdbc.queryForObject("""
+                        select exists(select 1 from study_copilot.t_user
+                        where id=? and status=1 and deleted=0 and session_version=?)
+                        """, Boolean.class, userId, version));
+                if (!active) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (BusinessException ex) {
+                SecurityContextHolder.clearContext();
             }
         }
         filterChain.doFilter(request, response);

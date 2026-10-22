@@ -58,6 +58,7 @@ management:
       show-details: when_authorized
 
 study-copilot:
+  recovery-support-channel: ${SC_RECOVERY_SUPPORT_CHANNEL}
   redis-key-prefix: "${SC_REDIS_PREFIX:study-copilot:}"
   storage:
     endpoint: ${SC_MINIO_ENDPOINT:http://127.0.0.1:9000}

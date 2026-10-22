@@ -10,6 +10,8 @@ package com.example.studycopilot.service.user;
 
 import com.example.studycopilot.dto.req.auth.LoginRequest;
 import com.example.studycopilot.dto.req.auth.RegisterRequest;
+import com.example.studycopilot.dto.req.auth.RefreshTokenRequest;
+import com.example.studycopilot.dto.req.auth.LogoutRequest;
 import com.example.studycopilot.dto.resp.auth.LoginResponse;
 
 /**
@@ -22,7 +24,7 @@ public interface AuthService {
      *
      * @param request 注册请求
      */
-    void register(RegisterRequest request);
+    LoginResponse register(RegisterRequest request, String requestId);
 
     /**
      * 用户登录。
@@ -38,5 +40,7 @@ public interface AuthService {
      * @param refreshToken Refresh Token
      * @return 登录响应
      */
-    LoginResponse refresh(String refreshToken);
+    LoginResponse refresh(RefreshTokenRequest request);
+
+    void logout(LogoutRequest request);
 }

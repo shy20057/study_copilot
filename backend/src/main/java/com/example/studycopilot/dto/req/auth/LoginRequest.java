@@ -8,18 +8,16 @@
  */
 package com.example.studycopilot.dto.req.auth;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 登录请求。
  */
-@Data
+@Getter @Setter
 public class LoginRequest {
 
-    @NotBlank
     private String username;
 
-    @NotBlank
     private String password;
 }

@@ -33,7 +33,7 @@ public enum ScErrorCode implements IErrorCode {
     // 认证与用户
     USER_NOT_FOUND("SC_002001", "用户不存在"),
     USER_DISABLED("SC_002002", "账号已被禁用"),
-    USER_PASSWORD_ERROR("SC_002003", "用户名或密码错误"),
+    USER_PASSWORD_ERROR("SC_002003", "账号或密码不正确"),
     TOKEN_EXPIRED("SC_002004", "Token 已过期"),
     TOKEN_INVALID("SC_002005", "Token 无效"),
     UNAUTHORIZED("SC_002006", "未登录或登录已过期"),

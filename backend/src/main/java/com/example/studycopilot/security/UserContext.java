@@ -10,6 +10,7 @@ package com.example.studycopilot.security;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 
 /**
  * 当前登录用户上下文工具。
@@ -23,9 +24,16 @@ public class UserContext {
      */
     public static Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Long) {
+        if (authentication != null && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof Long id && id > 0) {
             return (Long) authentication.getPrincipal();
         }
         return null;
+    }
+
+    public static Long requireUserId() {
+        Long id = getCurrentUserId();
+        if (id == null) throw new InsufficientAuthenticationException("Authentication required");
+        return id;
     }
 }

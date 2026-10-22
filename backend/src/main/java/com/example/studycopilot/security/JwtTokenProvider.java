@@ -9,6 +9,7 @@
 package com.example.studycopilot.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -19,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
+import com.example.studycopilot.common.errorcode.ScErrorCode;
+import com.example.studycopilot.common.exception.BusinessException;
 
 /**
  * JWT Token 生成与解析。
@@ -29,64 +32,41 @@ public class JwtTokenProvider {
 
     private final JwtProperties jwtProperties;
 
-    /**
-     * 生成 Access Token。
-     *
-     * @param userId 用户ID
-     * @return Token 字符串
-     */
-    public String generateAccessToken(Long userId) {
-        return generateToken(userId, jwtProperties.getAccessTtlSeconds());
+    public String generateAccessToken(long userId, long version, long sessionId, Instant issuedAt, Instant expiresAt) {
+        return builder(userId, issuedAt, expiresAt).setId(Long.toString(sessionId))
+                .claim("type", "access").claim("sessionVersion", version)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256).compact();
     }
 
-    /**
-     * 生成 Refresh Token。
-     *
-     * @param userId 用户ID
-     * @return Token 字符串
-     */
-    public String generateRefreshToken(Long userId) {
-        return generateToken(userId, jwtProperties.getRefreshTtlSeconds());
+    public String generateRefreshToken(long userId, long sessionId, Instant issuedAt, Instant expiresAt) {
+        return builder(userId, issuedAt, expiresAt).claim("type", "refresh").claim("refreshSessionId", sessionId)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256).compact();
     }
 
-    private String generateToken(Long userId, Long ttlSeconds) {
-        Instant now = Instant.now();
-        return Jwts.builder()
-                .setIssuer(jwtProperties.getIssuer())
-                .setSubject(String.valueOf(userId))
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(now.plusSeconds(ttlSeconds)))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+    private io.jsonwebtoken.JwtBuilder builder(long userId, Instant issuedAt, Instant expiresAt) {
+        return Jwts.builder().setIssuer(jwtProperties.getIssuer()).setSubject(Long.toString(userId))
+                .setIssuedAt(Date.from(issuedAt)).setExpiration(Date.from(expiresAt));
     }
 
-    /**
-     * 解析 Token 获取用户ID。
-     *
-     * @param token JWT Token
-     * @return 用户ID
-     */
-    public Long parseUserId(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return Long.valueOf(claims.getSubject());
-    }
+    public Claims parseAccess(String token) { return parse(token, "access", "sessionVersion"); }
+    public Claims parseRefresh(String token) { return parse(token, "refresh", "refreshSessionId"); }
 
-    /**
-     * 校验 Token 是否有效。
-     *
-     * @param token JWT Token
-     * @return true 有效，false 无效
-     */
-    public boolean validateToken(String token) {
+    private Claims parse(String token, String type, String numericClaim) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
-            return true;
-        } catch (Exception e) {
-            return false;
+            if (token == null || token.length() > 4096) throw new IllegalArgumentException();
+            Claims claims = Jwts.parserBuilder().requireIssuer(jwtProperties.getIssuer()).require("type", type)
+                    .setSigningKey(getSigningKey()).build().parseClaimsJws(token).getBody();
+            long userId = Long.parseLong(claims.getSubject());
+            Object number = claims.get(numericClaim);
+            if (userId <= 0 || !(number instanceof Integer || number instanceof Long)
+                    || ((Number) number).longValue() < (type.equals("refresh") ? 1 : 0)
+                    || claims.getIssuedAt() == null || claims.getExpiration() == null
+                    || !claims.getExpiration().after(claims.getIssuedAt())
+                    || claims.getIssuedAt().toInstant().isAfter(Instant.now())) throw new IllegalArgumentException();
+            return claims;
+        } catch (JwtException | IllegalArgumentException ex) {
+            // Parser messages can contain token fragments and are deliberately discarded.
+            throw new BusinessException(ScErrorCode.UNAUTHORIZED);
         }
     }
 

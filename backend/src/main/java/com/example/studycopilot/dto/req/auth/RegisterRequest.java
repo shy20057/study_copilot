@@ -8,21 +8,24 @@
  */
 package com.example.studycopilot.dto.req.auth;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
+import jakarta.validation.constraints.Email;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 注册请求。
  */
-@Data
+@Getter @Setter
 public class RegisterRequest {
 
-    @NotBlank
+    @ValidUsername
     private String username;
 
-    @NotBlank
+    @ValidPassword
     private String password;
 
+    @Email
+    @Size(max = 100)
     private String email;
 }
