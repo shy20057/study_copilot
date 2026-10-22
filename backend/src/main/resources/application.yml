@@ -1,0 +1,60 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: study-copilot-service
+  profiles:
+    default: dev
+  main:
+    allow-bean-definition-overriding: false
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/study_copilot?currentSchema=study_copilot}
+    username: ${POSTGRES_USER:study_copilot}
+    password: ${POSTGRES_PASSWORD:change-me-postgres}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    schemas: study_copilot
+    default-schema: study_copilot
+    create-schemas: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6381}
+      password: ${REDIS_PASSWORD:change-me-redis}
+      timeout: 3s
+  cache:
+    redis:
+      time-to-live: 10m
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.example.studycopilot.dao.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+jwt:
+  issuer: ${JWT_ISSUER:study-copilot}
+  secret: ${JWT_SECRET:replace-with-at-least-32-random-bytes}
+  access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:7200}
+  refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:604800}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
