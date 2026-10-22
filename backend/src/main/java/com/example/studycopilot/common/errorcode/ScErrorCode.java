@@ -37,8 +37,9 @@ public enum ScErrorCode implements IErrorCode {
     TOKEN_EXPIRED("SC_002004", "Token 已过期"),
     TOKEN_INVALID("SC_002005", "Token 无效"),
     UNAUTHORIZED("SC_002006", "未登录或登录已过期"),
-    FORBIDDEN("SC_002007", "无权限访问"),
+    // Intentional compatibility alias; SC_002006 normalizes to UNAUTHORIZED and its public message.
     AUTH_REQUIRED("SC_002006", "请先登录"),
+    FORBIDDEN("SC_002007", "无权限访问"),
     TOKEN_REVOKED("SC_002008", "登录凭证已撤销，请重新登录"),
 
     // 设置
@@ -117,6 +118,9 @@ public enum ScErrorCode implements IErrorCode {
     }
 
     public static ScErrorCode fromCode(String code, ScErrorCode fallback) {
+        if (UNAUTHORIZED.code.equals(code)) {
+            return UNAUTHORIZED;
+        }
         for (ScErrorCode candidate : values()) {
             if (candidate.code.equals(code)) {
                 return candidate;

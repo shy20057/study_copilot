@@ -1,5 +1,8 @@
 package com.example.studycopilot.api;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.example.studycopilot.common.global.GlobalExceptionHandler;
 import com.example.studycopilot.common.errorcode.ScErrorCode;
 import com.example.studycopilot.common.exception.BusinessException;
@@ -13,12 +16,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
+import org.slf4j.LoggerFactory;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,8 +35,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.UUID;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -197,6 +208,94 @@ class ErrorContractTest {
                 .andExpect(jsonPath("$.code").value("SC_001004"));
     }
 
+    @Test
+    void unexpectedFailureLogContainsTraceAndApplicationOriginWithoutPrivateData() throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> capture = new ListAppender<>();
+        capture.start();
+        logger.addAppender(capture);
+        try {
+            mvc.perform(get("/test/error/exception/unexpected").header("X-Trace-Id", "diagnostic-trace"))
+                    .andExpect(status().isInternalServerError());
+            assertThat(capture.list).hasSize(1);
+            ILoggingEvent event = capture.list.get(0);
+            assertThat(event.getFormattedMessage()).contains("diagnostic-trace", "IllegalStateException",
+                            "ErrorContractTest$ErrorProbeController.exception")
+                    .containsPattern("ErrorProbeController\\.exception:[0-9]+")
+                    .doesNotContain("private-exception-marker", "SQL", "/internal/path");
+            assertThat(event.getThrowableProxy()).isNull();
+        } finally {
+            logger.detachAppender(capture);
+            capture.stop();
+        }
+    }
+
+    @Test
+    void diagnosticFramesAreApplicationOnlySanitizedAndBounded() throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> capture = new ListAppender<>();
+        capture.start();
+        logger.addAppender(capture);
+        try {
+            mvc.perform(get("/test/error/diagnostic").header("X-Trace-Id", "bounded-trace"))
+                    .andExpect(status().isInternalServerError());
+            assertThat(capture.list).hasSize(1);
+            ILoggingEvent event = capture.list.get(0);
+            String message = event.getFormattedMessage();
+            assertThat(message).contains("bounded-trace", "com.example.studycopilot.service.FocusService.settle:73")
+                    .doesNotContain("private-", "org.springframework", "studycopilotx", "\\", "/", "\n", "\r", "Further9");
+            assertThat(message.length()).isLessThanOrEqualTo(1200);
+            assertThat(java.util.regex.Pattern.compile("com\\.example\\.studycopilot\\.[A-Za-z0-9_.$]+:[0-9]+")
+                    .matcher(message).results().count()).isBetween(1L, 5L);
+            assertThat(event.getThrowableProxy()).isNull();
+        } finally {
+            logger.detachAppender(capture);
+            capture.stop();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ASYNC", "ERROR"})
+    void redispatchRebindsTheOriginalTraceAndCleansUpAfterDownstreamFailure(String dispatch) throws Exception {
+        TraceIdFilter filter = new TraceIdFilter();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Trace-Id", "original-dispatch-trace");
+        MockHttpServletResponse initialResponse = new MockHttpServletResponse();
+        filter.doFilter(request, initialResponse, (req, res) -> {
+            assertThat(MDC.get("traceId")).isEqualTo("original-dispatch-trace");
+        });
+        assertThat(MDC.get("traceId")).isNull();
+        request.setDispatcherType(DispatcherType.valueOf(dispatch));
+        request.removeHeader("X-Trace-Id");
+        request.addHeader("X-Trace-Id", "changed-header");
+        if (request.getDispatcherType() == DispatcherType.ERROR) {
+            request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/test/error/success");
+        }
+        MockHttpServletResponse redispatchResponse = new MockHttpServletResponse();
+        assertThatThrownBy(() -> filter.doFilter(request, redispatchResponse, (req, res) -> {
+            assertThat(MDC.get("traceId")).isEqualTo("original-dispatch-trace");
+            throw new ServletException("private-filter-marker");
+        })).isInstanceOf(ServletException.class);
+        assertThat(redispatchResponse.getHeader("X-Trace-Id")).isEqualTo(initialResponse.getHeader("X-Trace-Id"));
+        assertThat(MDC.get("traceId")).isNull();
+        MockHttpServletRequest nextRequest = new MockHttpServletRequest();
+        nextRequest.addHeader("X-Trace-Id", "next-request-trace");
+        filter.doFilter(nextRequest, new MockHttpServletResponse(), (req, res) -> {
+            assertThat(MDC.get("traceId")).isEqualTo("next-request-trace");
+        });
+        assertThat(MDC.get("traceId")).isNull();
+    }
+
+    @Test
+    void authenticationAliasUsesTheCanonicalPublicMessage() throws Exception {
+        for (String name : new String[]{"AUTH_REQUIRED", "UNAUTHORIZED"}) {
+            mvc.perform(get("/test/error/domain/" + name))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("SC_002006"))
+                    .andExpect(jsonPath("$.message").value("未登录或登录已过期"));
+        }
+    }
+
     private JsonNode json(String content) throws Exception {
         return new ObjectMapper().readTree(content);
     }
@@ -252,6 +351,23 @@ class ErrorContractTest {
         @GetMapping("/parameter")
         Result<Void> parameter(@RequestParam("count") int count) {
             return Result.success();
+        }
+
+        @GetMapping("/diagnostic")
+        Result<Void> diagnostic() {
+            IllegalStateException failure = new IllegalStateException("private-exception-marker SQL password=private-password");
+            var frames = new ArrayList<StackTraceElement>();
+            frames.add(new StackTraceElement("org.springframework.Framework", "dispatch", "/private-framework-path", 12));
+            frames.add(new StackTraceElement("com.example.studycopilotx.OtherApp", "execute", "/private-other-path", 13));
+            frames.add(new StackTraceElement("com.example.studycopilot.Bad\r\nprivate-injection", "execute", "private-file", 14));
+            frames.add(new StackTraceElement("com.example.studycopilot.BadMethod", "execute\r\nprivate-injection", "private-file", 15));
+            frames.add(new StackTraceElement("com.example.studycopilot." + "VeryLong".repeat(100), "execute", "private-file", 16));
+            frames.add(new StackTraceElement("com.example.studycopilot.service.FocusService", "settle", "C:\\private-source-path.java", 73));
+            for (int i = 0; i < 100; i++) {
+                frames.add(new StackTraceElement("com.example.studycopilot.service.Further" + i, "process", "/private-source-path", 200 + i));
+            }
+            failure.setStackTrace(frames.toArray(StackTraceElement[]::new));
+            throw failure;
         }
     }
 

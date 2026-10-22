@@ -16,6 +16,7 @@ import com.example.studycopilot.support.trace.TraceIdFilter;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,12 +39,21 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Public error messages are catalogued, never copied from exception details or rejected input. */
 @RestControllerAdvice
 public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String INVALID_FIELD = "字段值不合法";
+    private static final String APPLICATION_PACKAGE = "com.example.studycopilot.";
+    private static final int MAX_ORIGIN_FRAMES = 5;
+    private static final Pattern SAFE_CLASS = Pattern.compile("[A-Za-z0-9_.$]{1,120}");
+    private static final Pattern SAFE_METHOD = Pattern.compile("[A-Za-z0-9_$<>]{1,60}");
+    private static final Pattern SAFE_TYPE = Pattern.compile("[A-Za-z0-9_$]{1,80}");
+    private static final Pattern SAFE_TRACE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
 
     @ExceptionHandler(AbstractException.class)
     public ResponseEntity<Result<Void>> domainException(AbstractException ex) {
@@ -105,9 +115,23 @@ public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> unexpectedException(Exception ex) {
-        // Keep request bodies, credentials, SQL, paths and exception messages out of logs and responses.
-        log.error("Unhandled request failure: {}", ex.getClass().getSimpleName());
+        String traceId = MDC.get(TraceIdFilter.MDC_KEY);
+        String type = ex.getClass().getSimpleName();
+        // Explicit correlation and bounded origins remain useful without throwable messages or filenames.
+        log.error("Unhandled request failure traceId={} type={} origins={}",
+                traceId != null && SAFE_TRACE.matcher(traceId).matches() ? traceId : "unavailable",
+                SAFE_TYPE.matcher(type).matches() ? type : "Exception", applicationOrigins(ex));
         return error(ScErrorCode.SYSTEM_ERROR);
+    }
+
+    private String applicationOrigins(Exception ex) {
+        String origins = Arrays.stream(ex.getStackTrace())
+                .filter(frame -> frame.getClassName().startsWith(APPLICATION_PACKAGE))
+                .filter(frame -> SAFE_CLASS.matcher(frame.getClassName()).matches()
+                        && SAFE_METHOD.matcher(frame.getMethodName()).matches())
+                .map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                .distinct().limit(MAX_ORIGIN_FRAMES).collect(Collectors.joining(","));
+        return origins.isEmpty() ? "unavailable" : origins;
     }
 
     private ResponseEntity<Result<Void>> validation(List<FieldViolation> fields) {
