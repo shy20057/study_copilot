@@ -76,6 +76,8 @@ Separately, `OwnerStore.jdbc` was a public field. It is now private with a `jdbc
 
 The HTTP contract for Tasks 6–11 is written down in `docs/demo-backend-delivery.md` under 最小接入约定. Use that; do not reverse-engineer it from the controllers.
 
+The route boundary was audited against the default profile and it is clean. Ten controllers are parked and must stay that way: the eight B/C controllers behind `future-features`, and the two superseded ones — the old task controller and the old tomato-clock controller — behind `legacy-api`. Neither profile is active by default, so the default profile exposes only Phase A routes. Watch the annotation style when auditing: some of them are written fully qualified as `@org.springframework.context.annotation.Profile("legacy-api")`, which a plain `grep "@Profile"` does not match.
+
 ## What is not done
 
 **Task 12 — avatar storage, account deletion, operational hardening.** Not started. The plan is `docs/superpowers/plans/2026-10-22-study-copilot-phase-a-backend.md`, Task 12, lines 798–854. Avatar upload is still a placeholder service; account deletion and data cleanup do not exist.
@@ -89,7 +91,7 @@ Known functional gaps in the Task 6–11 code, recorded in `docs/demo-backend-de
 - Repeat template edits only affect future instances; cancelling a parent task does not restore child task states on undo; delete-undo metadata is a simplified implementation.
 - Login has no progressive rate limiting. Operational metrics, backup/restore drills are absent.
 - The `dto/resp/notification` package is an empty directory.
-- `GET`/`POST /api/pomodoro` is a dead skeleton from before Task 8. `PomodoroServiceImpl` has six methods that are all TODO placeholders returning null, and unlike the legacy task controller it carries no profile, so it **is registered in the default profile**. `/api/focus` supersedes it. Parking it behind `legacy-api`, the profile `TaskController` already uses, would match how the other superseded controller was handled.
+- `POST /api/upload` is an unimplemented placeholder: `AttachmentServiceImpl.uploadImage` returns null. It is the avatar stub, and Task 12 owns it.
 
 ## How to run things
 
