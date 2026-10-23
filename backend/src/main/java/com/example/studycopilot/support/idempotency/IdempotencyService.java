@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.instrument.MeterRegistry;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -20,11 +21,13 @@ public class IdempotencyService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final IdempotencyProperties properties;
+    private final MeterRegistry metrics;
 
     @Transactional
     public <T> T execute(String operation,String requestId,Object normalizedRequest,Class<T> type,Supplier<T> mutation) {
         long uid=UserContext.requireUserId();
-        jdbc.queryForObject("select id from study_copilot.t_user where id=? for update",Long.class,uid);
+        if (jdbc.queryForList("select id from study_copilot.t_user where id=? and status=1 and deleted=0 for update",uid).isEmpty())
+            throw new BusinessException(ScErrorCode.TOKEN_REVOKED);
         if(requestId==null || !requestId.matches("[A-Za-z0-9._:-]{1,100}") || operation==null || operation.length()>50)
             throw new BusinessException(ScErrorCode.VALIDATION_ERROR);
         String hash=fingerprint(Map.of("owner",uid,"operation",operation,"requestId",requestId,"request",normalizedRequest));
@@ -32,7 +35,11 @@ public class IdempotencyService {
             (rs,n)->new String[]{rs.getString(1),rs.getString(2)},uid,operation,requestId);
         if(!previous.isEmpty()) {
             if(!hash.equals(previous.get(0)[0])) throw new BusinessException(ScErrorCode.IDEMPOTENCY_CONFLICT);
-            try {return json.readValue(previous.get(0)[1],type);} catch(Exception ex) {throw new IllegalStateException("Invalid durable idempotency response",ex);}
+            try {
+                T result = json.readValue(previous.get(0)[1],type);
+                metrics.counter("study_copilot.idempotency.replays").increment();
+                return result;
+            } catch(Exception ex) {throw new IllegalStateException("Invalid durable idempotency response",ex);}
         }
         T result=mutation.get();
         jdbc.update("insert into study_copilot.t_idempotency_record(user_id,operation_type,request_id,request_hash,response_status,result) values (?,?,?,?,200,?::jsonb)",uid,operation,requestId,hash,serialize(result));

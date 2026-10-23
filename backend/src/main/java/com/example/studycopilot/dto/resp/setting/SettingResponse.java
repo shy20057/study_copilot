@@ -26,6 +26,13 @@ public class SettingResponse {
     private Long defaultSubjectId;
     private Long version;
     private Long ruleVersion;
+    private Boolean partialRewardsEnabled;
+    private Boolean soundEnabled;
+    private Boolean animationsEnabled;
+    private String activeTimezone;
+    private Integer activeDayStartHour;
+    private Long activeRuleVersion;
+    private java.util.Map<String,Object> pendingLearningRule;
 
     private LocalDate examDate;
     private String timezone;

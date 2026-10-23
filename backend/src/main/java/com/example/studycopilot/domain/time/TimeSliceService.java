@@ -20,4 +20,19 @@ public class TimeSliceService {
         }
         return List.copyOf(slices);
     }
+
+    /** Allocate whole seconds using cumulative boundaries, preserving floor(total duration). */
+    public List<AllocatedSlice> allocate(Instant start, Instant end, ZoneId zone, int hour, long version) {
+        var result = new ArrayList<AllocatedSlice>();
+        long allocated = 0;
+        for (var slice : split(start, end, zone, hour, version)) {
+            long cumulative = Duration.between(start, slice.end()).getSeconds();
+            int seconds = Math.toIntExact(cumulative - allocated);
+            if (seconds > 0) result.add(new AllocatedSlice(slice, seconds));
+            allocated = cumulative;
+        }
+        return List.copyOf(result);
+    }
+
+    public record AllocatedSlice(LearningSlice interval, int seconds) { }
 }

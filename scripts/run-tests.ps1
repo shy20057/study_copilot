@@ -19,7 +19,7 @@ param(
 # Works on Windows PowerShell 5.1 and on PowerShell 7+.
 #
 # Requires the PostgreSQL container to be running with study_copilot_test
-# already provisioned. See docs/backend-local-development.md.
+# already provisioned. See docs/02-开发指南/后端本地开发.md.
 
 $ErrorActionPreference = 'Stop'
 

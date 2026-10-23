@@ -16,8 +16,17 @@ public class TemplateCatalog {
     public TemplateCatalog(ObjectMapper json) {
         try(var input=new ClassPathResource("templates/phase-a-study-templates.v1.json").getInputStream()) {resource=json.readValue(input,Resource.class);}
         catch(Exception ex){throw new IllegalStateException("Cannot load study templates",ex);}
-        if(resource.items().stream().anyMatch(i->i.learningDayOffset()<0 || i.learningDayOffset()>6 || i.plannedPomodoros()<1)
-            ||resource.items().stream().map(Item::id).distinct().count()!=resource.items().size()) throw new IllegalStateException("Invalid template item catalog");
+        if(resource.version()==null || resource.version().isBlank() || resource.version().length()>40
+            || resource.templates()==null || resource.templates().isEmpty() || resource.items()==null
+            || resource.templates().stream().anyMatch(t->t.id()==null || t.id().isBlank() || t.id().length()>100
+                || t.name()==null || t.name().isBlank() || t.minimumDays()<1 || t.stages()==null || t.stages().isEmpty()
+                || t.stages().size()>t.minimumDays() || t.stages().stream().anyMatch(s->s==null || s.isBlank()))
+            || resource.templates().stream().map(Definition::id).distinct().count()!=resource.templates().size()
+            || resource.items().stream().anyMatch(i->i.id()==null || i.id().isBlank() || i.id().length()>100
+                || i.title()==null || i.title().isBlank() || i.title().length()>200
+                || i.subjectAlias()==null || i.subjectAlias().isBlank() || i.subjectAlias().length()>50
+                || i.learningDayOffset()<0 || i.learningDayOffset()>6 || i.plannedPomodoros()<1 || i.plannedPomodoros()>16)
+            ||resource.items().stream().map(Item::id).distinct().count()!=resource.items().size()) throw new IllegalStateException("Invalid study template catalog");
     }
     public List<Definition> list(){return resource.templates();}
     public String version(){return resource.version();}

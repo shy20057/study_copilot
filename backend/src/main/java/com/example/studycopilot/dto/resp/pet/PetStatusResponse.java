@@ -23,4 +23,7 @@ public class PetStatusResponse {
     private Boolean maxLevel;
     private Integer nextLevelExp;
     private String stage;
+    private Long version;
+    private Long progressExp;
+    private Double progressPercentage;
 }

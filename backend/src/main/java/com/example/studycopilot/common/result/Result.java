@@ -43,6 +43,7 @@ public class Result<T> implements Serializable {
     private List<FieldViolation> fieldErrors = List.of();
     private Long currentVersion;
     private Object currentSession;
+    private Long retryAfterSeconds;
 
     /** Source-compatible alias; the wire contract exposes traceId only. */
     @Deprecated

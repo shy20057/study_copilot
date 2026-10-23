@@ -11,6 +11,12 @@ package com.example.studycopilot.controller.attachment;
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.service.attachment.AttachmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,5 +36,14 @@ public class AttachmentController {
     @PostMapping("/image")
     public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
         return Result.success(attachmentService.uploadImage(file));
+    }
+
+    @GetMapping("/images/{id}")
+    public ResponseEntity<byte[]> readImage(@PathVariable("id") long id) {
+        var image = attachmentService.readImage(id);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(image.mediaType())).body(image.bytes());
     }
 }

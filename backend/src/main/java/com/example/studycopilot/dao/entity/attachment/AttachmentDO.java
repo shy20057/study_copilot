@@ -34,6 +34,12 @@ public class AttachmentDO {
     /** 文件大小(字节) */
     private Integer sizeBytes;
 
+    /** 私有头像对象键 */
+    private String objectKey;
+
+    /** 服务端识别的图片类型 */
+    private String mediaType;
+
     /** 创建时间 */
     private Instant createTime;
 }

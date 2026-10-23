@@ -38,6 +38,12 @@ public class FocusController {
         return Result.success(service.current());
     }
 
+    @GetMapping("/{id}")
+    public Result<?> get(@PathVariable("id") long id) { return Result.success(service.get(id,false)); }
+
+    @GetMapping("/{id}/result")
+    public Result<?> result(@PathVariable("id") long id) { return Result.success(service.get(id,true)); }
+
     @PostMapping("/break/start")
     public Result<?> rest(@RequestBody Map<String, Object> b, @RequestHeader("Idempotency-Key") String key) {
         return Result.success(service.start(b, key, true));
@@ -47,6 +53,14 @@ public class FocusController {
     public Result<?> transition(@RequestBody Map<String, Object> b, @RequestHeader("Idempotency-Key") String key) {
         return Result.success(service.endBreakAndStart(b, key));
     }
+
+    @PostMapping("/break/{id}/end")
+    public Result<?> endBreak(@PathVariable("id") long id,@RequestHeader("Idempotency-Key") String key) {
+        return Result.success(service.endBreak(id,key));
+    }
+
+    @PostMapping("/records/manual/preview")
+    public Result<?> preview(@RequestBody Map<String,Object> body) { return Result.success(records.preview(body)); }
 
     @PostMapping("/{id}/complete")
     public Result<?> complete(

@@ -29,11 +29,18 @@ public class UpdateSettingRequest {
     @Pattern(regexp="DEFAULT|GRANTED|DENIED") private String notificationPermission;
     private Boolean reduceMotion;
     private Boolean reduceTransparency;
+    private Boolean partialRewardsEnabled;
+    private Boolean soundEnabled;
+    private Boolean animationsEnabled;
     private Long defaultSubjectId;
     @com.fasterxml.jackson.annotation.JsonIgnore private boolean weeklyGoalMinProvided;
     public void setWeeklyGoalMin(Integer value) { this.weeklyGoalMin=value; this.weeklyGoalMinProvided=true; }
 
     private LocalDate examDate;
+    @com.fasterxml.jackson.annotation.JsonIgnore private boolean examDateProvided;
+    public void setExamDate(LocalDate value) { this.examDate=value; this.examDateProvided=true; }
+    @com.fasterxml.jackson.annotation.JsonIgnore private boolean dailyAvailMinProvided;
+    public void setDailyAvailMin(Integer value) { this.dailyAvailMin=value; this.dailyAvailMinProvided=true; }
 
     @Size(max=50) private String timezone;
 
@@ -44,8 +51,8 @@ public class UpdateSettingRequest {
     @Min(1)
     private Integer weeklyGoalMin;
 
-    @Min(1)
-    @Max(240)
+    @Min(15)
+    @Max(90)
     private Integer focusMinutes;
 
     @Pattern(regexp="SYSTEM|LIGHT|DARK") private String theme;

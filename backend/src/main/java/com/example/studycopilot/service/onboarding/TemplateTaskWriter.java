@@ -21,7 +21,7 @@ public class TemplateTaskWriter {
         var subject=subjects.get(0);
         if(subject.archived()!=0)throw new BusinessException(ScErrorCode.SUBJECT_IN_USE);
         if(subject.version()!=subjectVersion)throw new BusinessException(ScErrorCode.VERSION_CONFLICT,subject.version(),null);
-        if(title==null || title.isBlank() || title.length()>200 || pomodoros<1 || pomodoros>99)throw new BusinessException(ScErrorCode.VALIDATION_ERROR);
+        if(title==null || title.isBlank() || title.length()>200 || pomodoros<1 || pomodoros>16)throw new BusinessException(ScErrorCode.VALIDATION_ERROR);
         return jdbc.queryForObject("""
             insert into study_copilot.t_task(user_id,title,subject_id,subject_name_snapshot,planned_pomodoros,
               estimated_focus_minutes,target_date,original_planned_date,learning_date,import_batch_id,

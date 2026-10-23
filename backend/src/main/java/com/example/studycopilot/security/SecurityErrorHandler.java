@@ -3,6 +3,7 @@ package com.example.studycopilot.security;
 import com.example.studycopilot.common.errorcode.ScErrorCode;
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.support.trace.TraceIdFilter;
+import com.example.studycopilot.support.metrics.ApiMetricsFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,7 +31,12 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
         write(request, response, ScErrorCode.FORBIDDEN);
     }
 
+    public void unavailable(HttpServletRequest request,HttpServletResponse response) throws IOException {
+        write(request,response,ScErrorCode.SYSTEM_ERROR);
+    }
+
     private void write(HttpServletRequest request, HttpServletResponse response, ScErrorCode code) throws IOException {
+        request.setAttribute(ApiMetricsFilter.ERROR_ATTRIBUTE, code.code());
         Result<Void> body = Result.<Void>failure(code).setTraceId((String) request.getAttribute(TraceIdFilter.ATTRIBUTE));
         response.setStatus(code.httpStatus().value());
         response.setContentType("application/json");

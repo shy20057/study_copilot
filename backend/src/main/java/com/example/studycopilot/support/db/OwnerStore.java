@@ -47,6 +47,7 @@ public class OwnerStore {
     }
 
     @SuppressWarnings("unchecked") public Map<String,Object> decode(Object value) {
+        if (value instanceof Map<?,?> map) return new LinkedHashMap<>((Map<String,Object>) map);
         try{return json.readValue(value.toString(),Map.class);}catch(Exception e){throw new IllegalStateException("Invalid stored JSON");}
     }
 
@@ -54,16 +55,33 @@ public class OwnerStore {
         try{return Long.parseLong(value.toString());}catch(Exception e){throw error(ScErrorCode.VALIDATION_ERROR);}
     }
 
-    public static int integer(Map<String,Object> m,String k,int fallback){return m.get(k)==null?fallback:Math.toIntExact(number(m.get(k)));}
+    public static int integer(Map<String,Object> m,String k,int fallback) {
+        try {
+            return m.get(k)==null?fallback:Math.toIntExact(number(m.get(k)));
+        } catch (ArithmeticException ex) {
+            throw error(ScErrorCode.VALIDATION_ERROR);
+        }
+    }
 
     public static String text(Map<String,Object> m,String k,String fallback){return m.get(k)==null?fallback:m.get(k).toString();}
 
-    public static LocalDate date(Object v){return v==null?null:LocalDate.parse(v.toString());}
+    public static LocalDate date(Object v) {
+        try {
+            return v==null?null:LocalDate.parse(v.toString());
+        } catch (DateTimeException ex) {
+            throw error(ScErrorCode.VALIDATION_ERROR);
+        }
+    }
 
     public static Instant instant(Object v) {
-        if(v instanceof java.sql.Timestamp t)return t.toInstant();
-        if(v instanceof OffsetDateTime t)return t.toInstant();
-        return Instant.parse(v.toString());
+        if (v == null) throw error(ScErrorCode.VALIDATION_ERROR);
+        try {
+            if(v instanceof java.sql.Timestamp t)return t.toInstant();
+            if(v instanceof OffsetDateTime t)return t.toInstant();
+            return Instant.parse(v.toString());
+        } catch (DateTimeException ex) {
+            throw error(ScErrorCode.VALIDATION_ERROR);
+        }
     }
 
     public static BusinessException error(ScErrorCode c){return new BusinessException(c);}

@@ -26,6 +26,22 @@ public class OnboardingServiceImpl implements OnboardingService {
     private final TemplateTaskWriter tasks;
     private final IdempotencyService idempotency;
 
+    @Override public Map<String,Object> planSummary() {
+        long uid=UserContext.requireUserId();
+        var rows=jdbc.queryForList("select import_batch_id,template_id,template_version,import_result::text payload from study_copilot.t_template_import_batch where user_id=? order by create_time desc,id desc limit 1",uid);
+        if(rows.isEmpty())return Map.of("stages",List.of());
+        var row=rows.get(0);
+        try {
+            var payload=json.readValue(row.get("payload").toString(),new TypeReference<Map<String,Object>>(){});
+            var result=new LinkedHashMap<String,Object>();
+            result.put("batchId",row.get("import_batch_id"));
+            result.put("templateId",row.get("template_id"));
+            result.put("templateVersion",row.get("template_version"));
+            result.put("stages",payload.getOrDefault("stages",List.of()));
+            return result;
+        } catch(java.io.IOException ex) {throw new IllegalStateException("Invalid stored plan summary");}
+    }
+
     @Override public OnboardingProgress progress(){return readProgress(UserContext.requireUserId());}
     @Override @Transactional public OnboardingProgress save(SaveOnboardingProgressRequest request) {
         long uid=lockOwner(); var progress=readProgress(uid); version(progress,request.version());
@@ -121,7 +137,12 @@ public class OnboardingServiceImpl implements OnboardingService {
         var chosen=items.stream().filter(TemplatePreview.Item::selectedByDefault).toList();
         return new TemplatePreview(templateId,catalog.version(),previewVersion,definition.name(),definition.description(),base,List.copyOf(stages),List.copyOf(items),chosen.size(),(int)chosen.stream().filter(i->i.learningDate().equals(today)).count(),chosen.stream().mapToInt(TemplatePreview.Item::estimatedFocusMinutes).sum(),true);
     }
-    private long lockOwner(){long uid=UserContext.requireUserId();jdbc.queryForObject("select id from study_copilot.t_user where id=? for update",Long.class,uid);return uid;}
+    private long lockOwner(){
+        long uid=UserContext.requireUserId();
+        if(jdbc.queryForList("select id from study_copilot.t_user where id=? and status=1 and deleted=0 for update",uid).isEmpty())
+            throw new BusinessException(ScErrorCode.TOKEN_REVOKED);
+        return uid;
+    }
     private OnboardingProgress readProgress(long uid) {
         return jdbc.queryForObject("select * from study_copilot.t_onboarding_progress where user_id=?",(rs,n)->{
             try {return new OnboardingProgress(rs.getString("current_step"),json.readValue(rs.getString("confirmed_data"),new TypeReference<Map<String,Object>>(){}),rs.getString("status"),rs.getLong("version"),rs.getTimestamp("completed_at")==null?null:rs.getTimestamp("completed_at").toInstant());}

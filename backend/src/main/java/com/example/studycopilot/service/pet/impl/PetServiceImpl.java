@@ -27,6 +27,9 @@ public class PetServiceImpl implements PetService {
         r.setNextLevelExp(level==10?null:(int)FocusService.THRESHOLDS[level]);
         r.setMaxLevel(level==10);
         r.setStage(level<=3?"JUVENILE":level<=6?"GROWING":level<=9?"MATURE":"ULTIMATE");
+        r.setVersion(OwnerStore.number(row.get("version")));
+        r.setProgressExp(exp-FocusService.THRESHOLDS[level-1]);
+        r.setProgressPercentage(level==10?100.0:(exp-FocusService.THRESHOLDS[level-1])*100.0/(FocusService.THRESHOLDS[level]-FocusService.THRESHOLDS[level-1]));
         return r;
     }
 

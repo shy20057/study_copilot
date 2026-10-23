@@ -16,10 +16,14 @@ import org.springframework.web.multipart.MultipartFile;
 public interface AttachmentService {
 
     /**
-     * 上传图片。
+     * 上传并设置私有头像。
      *
      * @param file 文件
-     * @return 附件 URL
+     * @return 需要 Bearer 鉴权的同源图片路由，前端应 fetch 后通过 Blob URL 展示
      */
     String uploadImage(MultipartFile file);
+
+    AvatarDownload readImage(long attachmentId);
+
+    record AvatarDownload(byte[] bytes, String mediaType) { }
 }

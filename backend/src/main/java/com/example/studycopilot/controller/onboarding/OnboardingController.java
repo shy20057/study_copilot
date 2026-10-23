@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/onboarding") @RequiredArgsConstructor
 public class OnboardingController {
     private final OnboardingService service;
+    @GetMapping("/plan") public Result<?> plan(){return Result.success(service.planSummary());}
     @GetMapping("/progress") public Result<OnboardingProgress> progress(){return Result.success(service.progress());}
     @PutMapping("/progress") public Result<OnboardingProgress> save(@Valid @RequestBody SaveOnboardingProgressRequest request){return Result.success(service.save(request));}
     @PostMapping("/complete") public Result<ImportResult> complete(@Valid @RequestBody CompleteOnboardingRequest request,@RequestHeader(value="Idempotency-Key",required=false) String requestId){return Result.success(service.complete(request,requestId));}
