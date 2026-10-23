@@ -22,5 +22,7 @@ logging:
 jwt:
   secret: ${SC_TEST_JWT_SECRET:test-only-signing-key-not-used-outside-test-profile}
 study-copilot:
+  idempotency:
+    hmac-secret: test-only-idempotency-hmac-secret-independent-of-jwt
   recovery-support-channel: test-only-support-channel
   redis-key-prefix: "study-copilot:test:"

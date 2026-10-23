@@ -58,6 +58,8 @@ management:
       show-details: when_authorized
 
 study-copilot:
+  idempotency:
+    hmac-secret: ${SC_IDEMPOTENCY_HMAC_SECRET}
   recovery-support-channel: ${SC_RECOVERY_SUPPORT_CHANNEL}
   redis-key-prefix: "${SC_REDIS_PREFIX:study-copilot:}"
   storage:

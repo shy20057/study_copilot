@@ -52,11 +52,15 @@ class AuthApiTest {
     @Autowired JwtProperties jwt;
     @Autowired PasswordEncoder encoder;
     private static final String PASSWORD = "Study-pass_123";
+    private final java.util.Set<String> fixtureNames = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @AfterEach
     void cleanup() {
         SecurityContextHolder.clearContext();
-        var ids = jdbc.queryForList("select id from study_copilot.t_user where normalized_username like 'auth_t3_%'", Long.class);
+        var ids = new java.util.HashSet<Long>();
+        for (String fixtureName : fixtureNames) {
+            ids.addAll(jdbc.queryForList("select id from study_copilot.t_user where normalized_username=?", Long.class, fixtureName));
+        }
         for (Long id : ids) {
             jdbc.update("update study_copilot.t_user_setting set default_subject_id=null where user_id=?", id);
             for (String table : List.of("t_refresh_session", "t_idempotency_record", "t_onboarding_progress",
@@ -104,7 +108,8 @@ class AuthApiTest {
 
     @Test
     void registrationUsesLocaleRootAndValidatesTheNormalizedNameLength() throws Exception {
-        String name = "auth_t3_" + "i".repeat(42);
+        String prefix = name();
+        String name = prefix + "i".repeat(50 - prefix.length());
         java.util.Locale previous = java.util.Locale.getDefault();
         try {
             java.util.Locale.setDefault(java.util.Locale.forLanguageTag("tr-TR"));
@@ -184,6 +189,93 @@ class AuthApiTest {
         assertThat(count("t_idempotency_record", "user_id", id)).isEqualTo(1);
         String persisted = jdbc.queryForObject("select result::text from study_copilot.t_idempotency_record where user_id=?", String.class, id);
         assertThat(persisted).doesNotContain(PASSWORD, first.path("accessToken").asText(), first.path("refreshToken").asText());
+    }
+
+    @Test
+    void registrationRequestIdConflictsWhenUsernameChangesBeforeUserIdentityExists() throws Exception {
+        String firstName = name(), secondName = name(), requestId = key();
+        registered(firstName, PASSWORD, requestId);
+        register(secondName, PASSWORD, requestId).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SC_001006"));
+        assertThat(jdbc.queryForObject("select count(*) from study_copilot.t_user where normalized_username=?", Integer.class, secondName)).isZero();
+    }
+
+    @Test
+    void concurrentDifferentUsernamesWithOneRegistrationRequestIdCreateOnlyOneAccount() throws Exception {
+        List<String> names = List.of(name(), name());
+        String requestId = key();
+        var index = new java.util.concurrent.atomic.AtomicInteger();
+        List<JsonNode> responses = concurrent(() -> json.readTree(register(names.get(index.getAndIncrement()), PASSWORD, requestId)
+                .andReturn().getResponse().getContentAsString()));
+        assertThat(responses).extracting(node -> node.path("code").asText()).containsExactlyInAnyOrder("0", "SC_001006");
+        assertThat(jdbc.queryForObject("select count(*) from study_copilot.t_user where normalized_username in (?,?)", Integer.class,
+                names.get(0), names.get(1))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from study_copilot.t_idempotency_record where operation_type='REGISTER' and request_id=?",
+                Integer.class, requestId)).isEqualTo(1);
+    }
+
+    @Test
+    void issuerRotationReturnsTokenRevokedWithoutReissuingOrMisreportingPayloadConflict() throws Exception {
+        String name = name(), requestId = key(), previous = jwt.getIssuer();
+        JsonNode first = registered(name, PASSWORD, requestId);
+        try {
+            jwt.setIssuer("synthetic-rotated-issuer");
+            register(name, PASSWORD, requestId).andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("SC_002008")).andExpect(jsonPath("$.data").isEmpty());
+            assertThat(count("t_refresh_session", "user_id", first.path("userId").asLong())).isEqualTo(1);
+        } finally { jwt.setIssuer(previous); }
+        assertThat(registered(name, PASSWORD, requestId)).isEqualTo(first);
+    }
+
+    @Test
+    void signingKeyRotationDoesNotChangeIdempotencyFingerprintAndReturnsTokenRevoked() throws Exception {
+        String name = name(), requestId = key(), previous = jwt.getSecret();
+        JsonNode first = registered(name, PASSWORD, requestId);
+        try {
+            jwt.setSecret("synthetic-rotated-signing-key-for-tests-only-12345");
+            register(name, PASSWORD, requestId).andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("SC_002008")).andExpect(jsonPath("$.data").isEmpty());
+            register(name, "Changed-pass_123", requestId).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("SC_001006"));
+            assertThat(count("t_refresh_session", "user_id", first.path("userId").asLong())).isEqualTo(1);
+        } finally { jwt.setSecret(previous); }
+        assertThat(registered(name, PASSWORD, requestId)).isEqualTo(first);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"revoked", "expired", "version", "disabled", "deleted", "hash", "metadata", "legacy", "missingSession", "accessExpired"})
+    void registrationReplayNeverReturnsCredentialsForAnInvalidOriginalSession(String invalidation) throws Exception {
+        String name = name(), requestId = key();
+        JsonNode first = registered(name, PASSWORD, requestId);
+        long userId = first.path("userId").asLong();
+        switch (invalidation) {
+            case "revoked" -> jdbc.update("update study_copilot.t_refresh_session set revoked_at=now() where user_id=?", userId);
+            case "expired" -> jdbc.update("update study_copilot.t_refresh_session set create_time=now()-interval '2 hours',expires_at=now()-interval '1 hour' where user_id=?", userId);
+            case "version" -> jdbc.update("update study_copilot.t_user set session_version=session_version+1 where id=?", userId);
+            case "disabled" -> jdbc.update("update study_copilot.t_user set status=0 where id=?", userId);
+            case "deleted" -> jdbc.update("update study_copilot.t_user set deleted=1 where id=?", userId);
+            case "hash" -> jdbc.update("update study_copilot.t_refresh_session set token_hash=? where user_id=?", "f".repeat(64), userId);
+            case "metadata" -> jdbc.update("update study_copilot.t_idempotency_record set result=jsonb_set(result,'{metadataVersion}','999') where user_id=?", userId);
+            case "legacy" -> jdbc.update("update study_copilot.t_idempotency_record set result=result-'metadataVersion'-'issuer'-'signingKeyFingerprint' where user_id=?", userId);
+            case "missingSession" -> jdbc.update("delete from study_copilot.t_refresh_session where user_id=?", userId);
+            case "accessExpired" -> jdbc.update("update study_copilot.t_idempotency_record set result=jsonb_set(result,'{accessExpiry}','1') where user_id=?", userId);
+            default -> throw new IllegalStateException("Unknown fixture");
+        }
+        register(name, PASSWORD, requestId).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SC_002008")).andExpect(jsonPath("$.data").isEmpty());
+        assertThat(count("t_refresh_session", "user_id", userId)).isEqualTo(invalidation.equals("missingSession") ? 0 : 1);
+    }
+
+    @Test
+    void cleanupCannotDeleteAnotherRunsWildcardMatchingUsername() throws Exception {
+        String foreignName = "authxt3youtside_" + UUID.randomUUID().toString().substring(0, 20);
+        Long foreignId = jdbc.queryForObject("insert into study_copilot.t_user(username,normalized_username,password) values (?,?,?) returning id",
+                Long.class, foreignName, foreignName, encoder.encode(PASSWORD));
+        try {
+            registered(name(), PASSWORD, key());
+            cleanup();
+            assertThat(count("t_user", "id", foreignId)).isEqualTo(1);
+        } finally { jdbc.update("delete from study_copilot.t_user where id=?", foreignId); }
     }
 
     @Test
@@ -394,6 +486,7 @@ class AuthApiTest {
         return mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)));
     }
     private ResultActions register(String name, String password, String key) throws Exception {
+        fixtureNames.add(name.trim().toLowerCase(java.util.Locale.ROOT));
         return mvc.perform(post("/api/auth/register").header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("username", name, "password", password))));
     }

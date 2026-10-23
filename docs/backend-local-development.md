@@ -48,6 +48,7 @@ The default runtime has no embedded credentials. Supply the following variables 
 | `SC_REDIS_HOST`, `SC_REDIS_PORT`, `SC_REDIS_PASSWORD` | Existing Redis connection; host/port default to `127.0.0.1:6381` |
 | `SC_REDIS_PREFIX` | Runtime namespace; default `study-copilot:` |
 | `SC_JWT_SECRET` | Random JWT signing secret with at least 32 UTF-8 bytes |
+| `SC_IDEMPOTENCY_HMAC_SECRET` | Separate random secret of at least 32 UTF-8 bytes for registration payload fingerprints; keep stable independently of JWT signing-key/issuer rotation |
 | `SC_RECOVERY_SUPPORT_CHANNEL` | Human support channel for invited-beta account recovery; required outside tests |
 | `SC_MINIO_ENDPOINT` | Existing MinIO API endpoint; default `http://127.0.0.1:9000` |
 | `SC_MINIO_BUCKET` | Separate avatar bucket; default `study-copilot` |
@@ -81,3 +82,5 @@ Focus `mode` uses `FOCUS`, `SHORT`, or `LONG`; `source` uses `TIMER` or `MANUAL`
 Repeated instances are unique per owner/template/learning day. Slices and rewards are unique per session/learning day. The reward ledger supports transactional quota enforcement in the settlement service; it does not independently enforce a sum across multiple rows. Legacy `t_pet_status.level` is retained for V1 compatibility and is explicitly nonauthoritative: Phase A must derive level from `total_exp`. Weekly targets are nullable and no longer receive an invented default.
 
 All B/C controllers (`chat`, `journal`, `knowledge`, `milestone`, `mistake`, `notification`, `reminder`, and `stat`) are behind `future-features`; the pre-existing missing `JournalController` import is repaired. The later operational-hardening task will audit the exhaustive route boundary. This foundation does not implement B/C behavior. Do not activate `future-features` in Phase A acceptance or deployment.
+
+Registration request IDs are global within the REGISTER operation before a user exists. Every application instance takes PostgreSQL advisory locks in the same order: request ID, normalized username, then user and refresh-session rows. The global rule is application-enforced over V2's user-scoped idempotency table; all registration writers must follow it. Changing any payload under a used request ID returns IDEMPOTENCY_CONFLICT. Valid replay metadata includes a version, original issuer and a non-secret signing-key fingerprint. Replay returns the identical original pair only while its configuration, account and durable session remain valid; configuration rotation, expired/revoked credentials or unsupported legacy metadata returns TOKEN_REVOKED and requires login. Never rotate the independent idempotency HMAC secret as part of ordinary JWT rotation.

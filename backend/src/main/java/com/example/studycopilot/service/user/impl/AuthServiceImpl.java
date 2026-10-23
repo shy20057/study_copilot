@@ -18,6 +18,7 @@ import com.example.studycopilot.service.user.AuthService;
 import com.example.studycopilot.common.errorcode.ScErrorCode;
 import com.example.studycopilot.common.exception.BusinessException;
 import com.example.studycopilot.security.JwtProperties;
+import com.example.studycopilot.security.IdempotencyProperties;
 import com.example.studycopilot.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -47,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwords;
     private final JwtTokenProvider tokens;
     private final JwtProperties properties;
+    private final IdempotencyProperties idempotency;
     private final ObjectMapper json;
 
     // Valid BCrypt hash used for absent users, keeping password work on both login branches.
@@ -61,18 +63,25 @@ public class AuthServiceImpl implements AuthService {
         }
         String hash = requestHash(name, request);
         return transactions.execute(status -> {
-            // PostgreSQL coordinates even requests handled by different application instances.
-            jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?,0))", Object.class, "auth-register:" + name);
+            // Global REGISTER request id -> normalized username -> user -> refresh row.
+            // Separate advisory namespaces prevent request/name hash collisions crossing lock classes.
+            // Login/refresh/password only take user -> refresh rows and never acquire advisory locks.
+            jdbc.queryForObject("select pg_advisory_xact_lock(71003,hashtext(?))", Object.class, requestId);
+            jdbc.queryForObject("select pg_advisory_xact_lock(71004,hashtext(?))", Object.class, name);
+            var records = jdbc.queryForList("""
+                    select user_id,request_hash,result::text from study_copilot.t_idempotency_record
+                    where operation_type='REGISTER' and request_id=? order by id limit 2
+                    """, requestId);
+            if (records.size() > 1) throw new BusinessException(ScErrorCode.IDEMPOTENCY_CONFLICT);
+            if (!records.isEmpty()) return replay(records.get(0), hash);
             var existing = jdbc.queryForList("select * from study_copilot.t_user where normalized_username=? for update", name);
-            if (!existing.isEmpty()) return replay(existing.get(0), requestId, hash);
+            if (!existing.isEmpty()) throw new BusinessException(ScErrorCode.BUSINESS_ERROR);
             var inserted = jdbc.queryForList("""
                     insert into study_copilot.t_user(username,normalized_username,password,email)
                     values (?,?,?,?) on conflict do nothing returning id
                     """, name, name, passwords.encode(request.getPassword()), request.getEmail());
             if (inserted.isEmpty()) {
                 // An external writer can race the advisory-lock protocol; ON CONFLICT keeps this transaction usable.
-                var winner = jdbc.queryForList("select * from study_copilot.t_user where normalized_username=? for update", name);
-                if (!winner.isEmpty()) return replay(winner.get(0), requestId, hash);
                 throw new BusinessException(ScErrorCode.BUSINESS_ERROR);
             }
             long userId = ((Number) inserted.get(0).get("id")).longValue();
@@ -143,18 +152,35 @@ public class AuthServiceImpl implements AuthService {
         });
     }
 
-    private LoginResponse replay(Map<String, Object> user, String requestId, String hash) {
-        var records = jdbc.queryForList("""
-                select request_hash,result::text from study_copilot.t_idempotency_record
-                where user_id=? and operation_type='REGISTER' and request_id=?
-                """, number(user, "id"), requestId);
-        if (records.isEmpty()) throw new BusinessException(ScErrorCode.BUSINESS_ERROR);
+    private LoginResponse replay(Map<String, Object> record, String hash) {
+        TokenGrant grant;
+        try { grant = json.readValue((String) record.get("result"), TokenGrant.class); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException ex) { throw revoked(); }
+        // Old metadata used the JWT key for payload fingerprints and cannot be safely replayed.
+        if (grant == null || grant.metadataVersion() != 1) throw revoked();
         if (!MessageDigest.isEqual(hash.getBytes(StandardCharsets.US_ASCII),
-                ((String) records.get(0).get("request_hash")).getBytes(StandardCharsets.US_ASCII)))
+                ((String) record.get("request_hash")).getBytes(StandardCharsets.US_ASCII)))
             throw new BusinessException(ScErrorCode.IDEMPOTENCY_CONFLICT);
-        if (!active(user)) throw unauthorized();
-        try { return response(json.readValue((String) records.get(0).get("result"), TokenGrant.class)); }
-        catch (com.fasterxml.jackson.core.JsonProcessingException ex) { throw new IllegalStateException("Invalid registration metadata"); }
+        if (!java.util.Objects.equals(grant.issuer(), properties.getIssuer())
+                || !java.util.Objects.equals(grant.signingKeyFingerprint(), digest(properties.getSecret()))) throw revoked();
+        var users = jdbc.queryForList("select * from study_copilot.t_user where id=? for update", number(record, "user_id"));
+        if (users.isEmpty() || !active(users.get(0))) throw revoked();
+        var user = users.get(0);
+        Instant now = Instant.now();
+        if (grant.userId() != number(user, "id") || grant.version() != number(user, "session_version")
+                || !java.util.Objects.equals(grant.username(), user.get("username"))
+                || grant.issuedAt() > now.getEpochSecond() || grant.accessExpiry() <= now.getEpochSecond()
+                || grant.refreshExpiry() <= now.getEpochSecond()) throw revoked();
+        var sessions = jdbc.queryForList("select * from study_copilot.t_refresh_session where id=? and user_id=? for update", grant.sessionId(), grant.userId());
+        if (sessions.isEmpty()) throw revoked();
+        var session = sessions.get(0);
+        if (session.get("revoked_at") != null || number(session, "session_version") != grant.version()
+                || !((Timestamp) session.get("expires_at")).toInstant().isAfter(now)
+                || !((Timestamp) session.get("expires_at")).toInstant().equals(Instant.ofEpochSecond(grant.refreshExpiry()))) throw revoked();
+        LoginResponse response = response(grant);
+        if (!MessageDigest.isEqual(digest(response.getRefreshToken()).getBytes(StandardCharsets.US_ASCII),
+                ((String) session.get("token_hash")).getBytes(StandardCharsets.US_ASCII))) throw revoked();
+        return response;
     }
 
     private TokenGrant newSession(long userId, String username, long version, String route) {
@@ -162,7 +188,8 @@ public class AuthServiceImpl implements AuthService {
         Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         TokenGrant grant = new TokenGrant(userId, username, version, id, now.getEpochSecond(),
                 now.plusSeconds(properties.getAccessTtlSeconds()).getEpochSecond(),
-                now.plusSeconds(properties.getRefreshTtlSeconds()).getEpochSecond(), route);
+                now.plusSeconds(properties.getRefreshTtlSeconds()).getEpochSecond(), route,
+                1, properties.getIssuer(), digest(properties.getSecret()));
         String refresh = response(grant).getRefreshToken();
         jdbc.update("""
                 insert into study_copilot.t_refresh_session(id,user_id,token_hash,session_version,expires_at)
@@ -198,7 +225,7 @@ public class AuthServiceImpl implements AuthService {
     private String requestHash(String name, RegisterRequest request) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(properties.getSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(idempotency.getHmacSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             // Length-safe structured encoding; the keyed digest cannot be used as an offline password verifier.
             byte[] payload = json.writeValueAsBytes(java.util.Arrays.asList("register-v1", name, request.getPassword(), request.getEmail()));
             return HexFormat.of().formatHex(mac.doFinal(payload));
@@ -221,9 +248,11 @@ public class AuthServiceImpl implements AuthService {
     private static boolean active(Map<String, Object> user) { return number(user, "status") == 1 && number(user, "deleted") == 0; }
     private static String normalize(String name) { return name == null ? "" : name.trim().toLowerCase(Locale.ROOT); }
     private static BusinessException unauthorized() { return new BusinessException(ScErrorCode.UNAUTHORIZED); }
+    private static BusinessException revoked() { return new BusinessException(ScErrorCode.TOKEN_REVOKED); }
 
     /** Only replay metadata is persisted, never a raw token or password. */
     public record TokenGrant(long userId, String username, long version, long sessionId, long issuedAt,
-                             long accessExpiry, long refreshExpiry, String nextRoute) {
+                             long accessExpiry, long refreshExpiry, String nextRoute,
+                             int metadataVersion, String issuer, String signingKeyFingerprint) {
     }
 }
