@@ -19,6 +19,9 @@ import lombok.Data;
 @Data
 @TableName("study_copilot.t_subject")
 public class SubjectDO {
+    private Long version;
+    private java.time.Instant createTime;
+    private java.time.Instant updateTime;
 
     @TableId(type = IdType.AUTO)
     private Long id;

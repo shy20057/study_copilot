@@ -9,6 +9,7 @@
 package com.example.studycopilot.service.subject;
 
 import com.example.studycopilot.dto.req.subject.CreateSubjectRequest;
+import com.example.studycopilot.dto.req.subject.SubjectStateRequest;
 import com.example.studycopilot.dto.resp.subject.SubjectResponse;
 
 import java.util.List;
@@ -43,9 +44,11 @@ public interface SubjectService {
     SubjectResponse update(Long id, CreateSubjectRequest request);
 
     /**
-     * 删除科目。
+     * 归档科目，保留历史引用；未完成任务要求明确迁移或取消策略。
      *
      * @param id 科目ID
      */
-    void delete(Long id);
+    SubjectResponse archive(Long id, SubjectStateRequest request);
+
+    SubjectResponse restore(Long id, SubjectStateRequest request);
 }

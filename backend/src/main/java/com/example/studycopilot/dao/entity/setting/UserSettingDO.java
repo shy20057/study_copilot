@@ -22,6 +22,14 @@ import java.time.LocalDate;
 @Data
 @TableName("study_copilot.t_user_setting")
 public class UserSettingDO {
+    private String goalName;
+    private Boolean muted;
+    private Boolean notificationsEnabled;
+    private String notificationPermission;
+    private Boolean reduceMotion;
+    private Boolean reduceTransparency;
+    private Long defaultSubjectId;
+    private Long version;
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -44,7 +52,7 @@ public class UserSettingDO {
     /** 默认专注时长 */
     private Integer focusMinutes;
 
-    /** 主题：light/dark */
+    /** 主题：SYSTEM/LIGHT/DARK */
     private String theme;
 
     /** 是否同意AI处理日志内容 */

@@ -17,11 +17,14 @@ import lombok.Data;
  */
 @Data
 public class CreateSubjectRequest {
+    @jakarta.validation.constraints.Min(0)
+    private Long version;
 
     @NotBlank
     @Size(max = 50)
     private String name;
 
+    @Size(max=20)
     private String color;
 
     private Integer sortOrder;

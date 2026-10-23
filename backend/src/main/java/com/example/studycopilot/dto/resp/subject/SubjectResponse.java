@@ -15,6 +15,7 @@ import lombok.Data;
  */
 @Data
 public class SubjectResponse {
+    private Long version;
 
     private Long id;
     private String name;

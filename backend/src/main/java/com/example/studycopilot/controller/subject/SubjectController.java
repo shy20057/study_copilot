@@ -10,11 +10,11 @@ package com.example.studycopilot.controller.subject;
 
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.dto.req.subject.CreateSubjectRequest;
+import com.example.studycopilot.dto.req.subject.SubjectStateRequest;
 import com.example.studycopilot.dto.resp.subject.SubjectResponse;
 import com.example.studycopilot.service.subject.SubjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,13 +46,17 @@ public class SubjectController {
     }
 
     @PutMapping("/{id}")
-    public Result<SubjectResponse> update(@PathVariable Long id, @Valid @RequestBody CreateSubjectRequest request) {
+    public Result<SubjectResponse> update(@PathVariable("id") Long id, @Valid @RequestBody CreateSubjectRequest request) {
         return Result.success(subjectService.update(id, request));
     }
 
-    @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable Long id) {
-        subjectService.delete(id);
-        return Result.success();
+    @PutMapping("/{id}/archive")
+    public Result<SubjectResponse> archive(@PathVariable("id") Long id, @Valid @RequestBody SubjectStateRequest request) {
+        return Result.success(subjectService.archive(id, request));
+    }
+
+    @PutMapping("/{id}/restore")
+    public Result<SubjectResponse> restore(@PathVariable("id") Long id, @Valid @RequestBody SubjectStateRequest request) {
+        return Result.success(subjectService.restore(id, request));
     }
 }

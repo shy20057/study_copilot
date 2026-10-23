@@ -17,6 +17,15 @@ import java.time.LocalDate;
  */
 @Data
 public class SettingResponse {
+    private String goalName;
+    private Boolean muted;
+    private Boolean notificationsEnabled;
+    private String notificationPermission;
+    private Boolean reduceMotion;
+    private Boolean reduceTransparency;
+    private Long defaultSubjectId;
+    private Long version;
+    private Long ruleVersion;
 
     private LocalDate examDate;
     private String timezone;
