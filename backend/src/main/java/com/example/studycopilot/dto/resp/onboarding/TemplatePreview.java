@@ -1,6 +1,7 @@
 package com.example.studycopilot.dto.resp.onboarding;
 import java.time.LocalDate;
 import java.util.List;
+/** Items are eligible candidates; summary totals describe only selected, not-yet-imported items. */
 public record TemplatePreview(String templateId,String templateVersion,String previewVersion,
     String displayName,String description,LocalDate learningDate,List<Stage> stages,List<Item> items,
     int taskCount,int todayTaskCount,int estimatedFocusMinutes,boolean editableAfterImport) {

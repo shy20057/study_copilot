@@ -142,6 +142,43 @@ class OnboardingApiTest {
         assertThat(jdbc.queryForObject("select estimated_focus_minutes from study_copilot.t_task where user_id=?",Integer.class,uid)).isEqualTo(25);
         assertThatThrownBy(()->jdbc.update("insert into study_copilot.t_task(user_id,title,import_batch_id,template_id,template_version,template_item_id,template_learning_date) select user_id,'different title',import_batch_id,template_id,'2',template_item_id,template_learning_date from study_copilot.t_task where user_id=?",uid)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
+    @Test void defaultPreviewTotalsDescribeSuggestedNewTasks() throws Exception {
+        var u=user();
+        call(get("/api/templates/foundation/preview"),u,null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.taskCount").value(9)).andExpect(jsonPath("$.data.todayTaskCount").value(3))
+            .andExpect(jsonPath("$.data.estimatedFocusMinutes").value(275));
+    }
+    @Test void explicitSingleSelectionHasSingleTaskTotals() throws Exception {
+        var u=user();
+        call(get("/api/templates/foundation/preview").param("itemIds","d0-read"),u,null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.taskCount").value(1)).andExpect(jsonPath("$.data.todayTaskCount").value(1))
+            .andExpect(jsonPath("$.data.estimatedFocusMinutes").value(25));
+    }
+    @Test void alreadyImportedSelectionContributesNothingToPreviewTotals() throws Exception {
+        var u=user();data(complete(u,"summary-import",body(preview(u),0,List.of("d0-read"))));
+        call(get("/api/templates/foundation/preview").param("itemIds","d0-read"),u,null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.taskCount").value(0)).andExpect(jsonPath("$.data.todayTaskCount").value(0))
+            .andExpect(jsonPath("$.data.estimatedFocusMinutes").value(0))
+            .andExpect(jsonPath("$.data.items[0].alreadyImported").value(true));
+    }
+    @Test void noTargetSprintPreviewAndImportedDatesStayWithinThreeDayStage() throws Exception {
+        var u=user();var p=data(call(get("/api/templates/sprint/preview"),u,null));
+        assertThat(p.path("items").size()).isEqualTo(6);
+        String end=java.time.LocalDate.parse(p.path("learningDate").asText()).plusDays(2).toString();
+        assertThat(p.path("stages").get(0).path("endDate").asText()).isEqualTo(end);
+        for(var item:p.path("items"))assertThat(item.path("learningDate").asText()).isLessThanOrEqualTo(end);
+        var b=body(p,0,List.of("d0-read","d1-review","d2-practice"));b.put("templateId","sprint");
+        data(complete(u,"sprint-valid",b));
+        assertThat(count(u,"t_task")).isEqualTo(3);
+        assertThat(jdbc.queryForObject("select max(template_learning_date)::text from study_copilot.t_task where user_id=?",String.class,u.path("userId").asLong())).isEqualTo(end);
+    }
+    @Test void noTargetSprintRejectsCompletionBeyondItsStageWithoutWrites() throws Exception {
+        var u=user();var p=data(call(get("/api/templates/sprint/preview"),u,null));
+        var b=body(p,0,List.of("d3-read"));b.put("templateId","sprint");
+        complete(u,"sprint-outside",b).andExpect(status().isBadRequest());
+        assertThat(count(u,"t_task")).isZero();assertThat(count(u,"t_template_import_batch")).isZero();
+        call(get("/api/templates/sprint/preview").param("itemIds","d3-read"),u,null).andExpect(status().isBadRequest());
+    }
     private long count(JsonNode u,String table) {return jdbc.queryForObject("select count(*) from study_copilot."+table+" where user_id=?",Long.class,u.path("userId").asLong());}
     private Map<String,Object> body(JsonNode p,long version,List<String> ids) {var b=new HashMap<String,Object>(); b.put("version",version);b.put("templateId","foundation");b.put("previewVersion",p.path("previewVersion").asText());b.put("learningDate",p.path("learningDate").asText());b.put("itemIds",ids);return b;}
     private JsonNode preview(JsonNode u) throws Exception {return data(call(get("/api/templates/foundation/preview"),u,null));}

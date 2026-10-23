@@ -87,6 +87,7 @@ public class OnboardingServiceImpl implements OnboardingService {
         LocalDate target=setting.get("exam_date")==null?null:((java.sql.Date)setting.get("exam_date")).toLocalDate();
         if(target!=null&&target.isBefore(base.plusDays(definition.minimumDays()-1)))
             throw new BusinessException(ScErrorCode.TEMPLATE_RANGE_INVALID);
+        LocalDate end=target==null?base.plusDays(definition.minimumDays()-1):target;
         var subjects=jdbc.query("select id,name,version from study_copilot.t_subject where user_id=? and archived=0 order by sort_order,id",(rs,n)->new Subject(rs.getLong(1),rs.getString(2),rs.getLong(3)),uid);
         if(subjects.isEmpty())throw new BusinessException(ScErrorCode.SUBJECT_NOT_FOUND);
         var defaultSubject=subjects.stream().filter(s->Objects.equals(s.id(),setting.get("default_subject_id"))).findFirst().orElse(subjects.get(0));
@@ -98,7 +99,7 @@ public class OnboardingServiceImpl implements OnboardingService {
         var items=new ArrayList<TemplatePreview.Item>(); var dailyMinutes=new HashMap<LocalDate,Integer>();int defaultToday=0;
         for(var item:catalog.items()) {
             LocalDate date=base.plusDays(item.learningDayOffset());
-            if(date.isAfter(today.plusDays(6))||(target!=null&&date.isAfter(target)))continue;
+            if(date.isAfter(today.plusDays(6))||date.isAfter(end))continue;
             var subject=subjects.stream().filter(s->s.name().equalsIgnoreCase(item.subjectAlias())).findFirst().orElse(defaultSubject);
             boolean exists=imported.contains(item.id()+"@"+date); int minutes=item.plannedPomodoros()*focus;
             boolean chosen=!exists&&(selected==null?(!date.equals(today)||defaultToday<3)&&dailyMinutes.getOrDefault(date,0)+minutes<=budget:selected.contains(item.id()));
@@ -108,7 +109,6 @@ public class OnboardingServiceImpl implements OnboardingService {
         if(selected!=null&&!items.stream().map(TemplatePreview.Item::itemId).collect(java.util.stream.Collectors.toSet()).containsAll(selected))
             throw new BusinessException(ScErrorCode.VALIDATION_ERROR);
         var stages=new ArrayList<TemplatePreview.Stage>();
-        LocalDate end=target==null?base.plusDays(definition.minimumDays()-1):target;
         long span=java.time.temporal.ChronoUnit.DAYS.between(base,end)+1;
         for(int i=0;i<definition.stages().size();i++) {
             LocalDate start=base.plusDays(span*i/definition.stages().size());
@@ -118,7 +118,8 @@ public class OnboardingServiceImpl implements OnboardingService {
         // Full resource content is fingerprinted, so accidental edits without version bumps still invalidate previews.
         var versionData=new HashMap<String,Object>();versionData.put("owner",uid);versionData.put("definition",definition);versionData.put("catalogVersion",catalog.version());versionData.put("items",catalog.items());versionData.put("settings",setting);versionData.put("subjects",subjects);versionData.put("base",base);versionData.put("currentLearningDate",today);versionData.put("ruleVersion",context.ruleVersion());
         String previewVersion=idempotency.fingerprint(versionData);
-        return new TemplatePreview(templateId,catalog.version(),previewVersion,definition.name(),definition.description(),base,List.copyOf(stages),List.copyOf(items),items.size(),(int)items.stream().filter(i->i.learningDate().equals(today)).count(),items.stream().mapToInt(TemplatePreview.Item::estimatedFocusMinutes).sum(),true);
+        var chosen=items.stream().filter(TemplatePreview.Item::selectedByDefault).toList();
+        return new TemplatePreview(templateId,catalog.version(),previewVersion,definition.name(),definition.description(),base,List.copyOf(stages),List.copyOf(items),chosen.size(),(int)chosen.stream().filter(i->i.learningDate().equals(today)).count(),chosen.stream().mapToInt(TemplatePreview.Item::estimatedFocusMinutes).sum(),true);
     }
     private long lockOwner(){long uid=UserContext.requireUserId();jdbc.queryForObject("select id from study_copilot.t_user where id=? for update",Long.class,uid);return uid;}
     private OnboardingProgress readProgress(long uid) {
