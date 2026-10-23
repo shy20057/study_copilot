@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "templates": [
+    {"id":"foundation","name":"基础","description":"从理解与小练习开始，可调整的示例安排。","minimumDays":7,"stages":["基础学习"]},
+    {"id":"reinforcement","name":"强化","description":"用练习与复习巩固理解，可调整的示例安排。","minimumDays":7,"stages":["强化练习"]},
+    {"id":"sprint","name":"冲刺","description":"聚焦近期回顾，可调整的示例安排。","minimumDays":3,"stages":["重点回顾"]},
+    {"id":"full-course","name":"全程","description":"仅生成近期七个学习日，后续阶段由你继续安排。","minimumDays":21,"stages":["基础学习","强化练习","冲刺回顾"]}
+  ],
+  "items": [
+    {"id":"d0-read","title":"阅读一节并记录疑问","subjectAlias":"default","learningDayOffset":0,"plannedPomodoros":1},
+    {"id":"d0-practice","title":"完成一组基础练习","subjectAlias":"数学","learningDayOffset":0,"plannedPomodoros":1},
+    {"id":"d0-recall","title":"回忆今天的三个要点","subjectAlias":"英语","learningDayOffset":0,"plannedPomodoros":1},
+    {"id":"d0-extra","title":"整理一个待解决问题","subjectAlias":"default","learningDayOffset":0,"plannedPomodoros":1},
+    {"id":"d1-review","title":"复习昨天的学习笔记","subjectAlias":"default","learningDayOffset":1,"plannedPomodoros":1},
+    {"id":"d2-practice","title":"练习并核对解题过程","subjectAlias":"数学","learningDayOffset":2,"plannedPomodoros":2},
+    {"id":"d3-read","title":"继续阅读下一节","subjectAlias":"default","learningDayOffset":3,"plannedPomodoros":1},
+    {"id":"d4-recall","title":"回顾易忘的知识点","subjectAlias":"英语","learningDayOffset":4,"plannedPomodoros":1},
+    {"id":"d5-practice","title":"做一组综合练习","subjectAlias":"数学","learningDayOffset":5,"plannedPomodoros":2},
+    {"id":"d6-review","title":"整理本周收获与下一步","subjectAlias":"default","learningDayOffset":6,"plannedPomodoros":1}
+  ]
+}

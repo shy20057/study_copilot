@@ -91,6 +91,7 @@ public enum ScErrorCode implements IErrorCode {
 
     // 通知
     NOTIFICATION_NOT_FOUND("SC_014001", "站内消息不存在"),
+    TEMPLATE_RANGE_INVALID("SC_015001", "目标日期不足以容纳所选阶段，请选择较短模板或自行安排"),
     ;
 
     private final String code;
@@ -100,7 +101,8 @@ public enum ScErrorCode implements IErrorCode {
         return switch (this) {
             case SYSTEM_ERROR, AI_SERVICE_UNAVAILABLE -> HttpStatus.INTERNAL_SERVER_ERROR;
             case VALIDATION_ERROR, MILESTONE_STATUS_INVALID, TASK_STATUS_INVALID,
-                    POMODORO_STATUS_INVALID, POMODORO_DURATION_INVALID, PET_TYPE_INVALID -> HttpStatus.BAD_REQUEST;
+                    POMODORO_STATUS_INVALID, POMODORO_DURATION_INVALID, PET_TYPE_INVALID,
+                    TEMPLATE_RANGE_INVALID -> HttpStatus.BAD_REQUEST;
             case USER_PASSWORD_ERROR, TOKEN_EXPIRED, TOKEN_INVALID, UNAUTHORIZED, AUTH_REQUIRED,
                     TOKEN_REVOKED -> HttpStatus.UNAUTHORIZED;
             case USER_DISABLED, FORBIDDEN -> HttpStatus.FORBIDDEN;
