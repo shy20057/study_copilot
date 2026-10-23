@@ -15,7 +15,7 @@
 
 **Task 6–11 的说明**：任务状态在账本中未勾选，因为它们是在账本最后一次更新后，
 按"直接实现、不再走 TDD/独立评审"的指令一次性补上的（commit `1427692`）。
-这些任务的 report 因此缺失，实现契约以代码和 `docs/demo-backend-delivery.md` 为准。
+这些任务的 report 因此缺失，实现契约以代码和 `docs/delivery.md` 为准。
 
 原目录中的 `.diff`（review 快照）可由 `git diff <a>..<b>` 重新生成；
 `.log` 为一次性测试输出，未保留。
