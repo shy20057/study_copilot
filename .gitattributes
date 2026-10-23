@@ -1,0 +1,4 @@
+# Pin repository line endings so every checkout is byte-identical.
+# Without this, core.autocrlf makes two clones of the same commit differ on
+# disk and `diff -r` reports every source file as changed.
+* text=auto eol=lf
