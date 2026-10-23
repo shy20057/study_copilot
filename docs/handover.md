@@ -114,6 +114,8 @@ powershell -NoProfile -File scripts/run-tests.ps1
 
 The database must be owned by the login role the tests use, not by a superuser. If Flyway's history table is owned by someone else, every Spring context fails with `permission denied for table flyway_schema_history`.
 
+A container named `sc-test-pg` from this recipe was left running on this machine with the test database already provisioned and owned by the test role. Check `docker ps` before re-creating it, and reuse it if it is there.
+
 ### The application
 
 The application has never been started. It needs a `study_copilot` database, a `study_copilot_app` role, Redis, and MinIO, plus the environment variables listed in `docs/backend-local-development.md`. The dev database and the `study_copilot_app` role do not exist yet — creating them was out of scope for the handover.
