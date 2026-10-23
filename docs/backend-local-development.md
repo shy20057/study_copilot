@@ -71,6 +71,37 @@ mvn -f backend/pom.xml -Dspring.profiles.active=test -Dtest=MigrationSmokeTest t
 mvn -f backend/pom.xml -Dspring.profiles.active=test test
 ```
 
+Both need `SC_TEST_DB_URL`, `SC_TEST_DB_USER`, and `SC_TEST_DB_PASSWORD` set. The repository ships a wrapper that handles the credential lifecycle for you. It sets a throwaway password on the `study_copilot_test_runner` role, injects it through the environment, and clears it again afterwards, so nothing reaches disk or a shell transcript:
+
+```powershell
+powershell -NoProfile -File scripts/run-tests.ps1
+powershell -NoProfile -File scripts/run-tests.ps1 -Selection "AuthApiTest"
+```
+
+The wrapper talks to `procurement-stack-postgres-1` on port 5433 by default. Override with `SC_PG_CONTAINER` and `SC_TEST_DB_URL` when the tests should run somewhere else.
+
+### Running the tests without touching the shared stack
+
+Changing a role password on the shared PostgreSQL container is a write to a workload other projects also use. To avoid it entirely, run the tests against a disposable container of your own. The `study_copilot` schema is created by Flyway, so the only requirement is a database named exactly `study_copilot_test` whose owner is the login role the tests use:
+
+```powershell
+docker run -d --name sc-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=postgres -p 127.0.0.1:5434:5432 postgres:16-alpine
+docker exec sc-test-pg psql -U postgres -d postgres -c "create role study_copilot_test_runner login"
+docker exec sc-test-pg psql -U postgres -d postgres -c "create database study_copilot_test owner study_copilot_test_runner"
+```
+
+Then run the wrapper against it:
+
+```powershell
+$env:SC_PG_CONTAINER = 'sc-test-pg'
+$env:SC_TEST_DB_URL = 'jdbc:postgresql://127.0.0.1:5434/study_copilot_test?currentSchema=study_copilot'
+powershell -NoProfile -File scripts/run-tests.ps1
+```
+
+`POSTGRES_HOST_AUTH_METHOD=trust` is acceptable only because the container binds to loopback and is thrown away afterwards; it removes the need to manage any credential at all. Use a real password for anything that outlives the run.
+
+The test profile refuses any database whose name is not exactly `study_copilot_test`, so the name above is not optional.
+
 ## Schema and boundaries
 
 ### Cross-resource mutation locking contract (Tasks 4–8)
