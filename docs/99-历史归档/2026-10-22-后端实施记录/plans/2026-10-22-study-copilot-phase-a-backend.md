@@ -1,5 +1,7 @@
 # Study Copilot Phase A Backend Implementation Plan
 
+> 历史归档：本文记录早期方案或实施过程，其中的流程要求、授权和验证结论仅适用于当时。当前状态见 [后端交付说明](../../../04-交付验收/一期A后端交付说明.md)，旧路径的新位置见 [归档索引](../../README.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the complete Phase A backend for Study Copilot: invited-beta authentication, onboarding, tasks, trustworthy focus sessions, manual records, rewards, pets, and the dashboard aggregate.

@@ -18,6 +18,7 @@ import com.example.studycopilot.common.exception.BusinessException;
 import com.example.studycopilot.dao.entity.subject.SubjectDO;
 import com.example.studycopilot.dto.req.subject.SubjectStateRequest;
 import com.example.studycopilot.security.UserContext;
+import com.example.studycopilot.service.task.TaskWorkflowService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +34,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SubjectServiceImpl implements SubjectService {
     private final JdbcTemplate jdbc;
+    private final TaskWorkflowService tasks;
 
     @Override
     public List<SubjectResponse> list() {
@@ -78,10 +80,18 @@ public class SubjectServiceImpl implements SubjectService {
             var replacement=find(uid,request.getTargetSubjectId());
             if(replacement.getArchived()!=0) throw new BusinessException(ScErrorCode.SUBJECT_IN_USE);
             target=replacement.getId();
-            jdbc.update("update study_copilot.t_task set subject_id=?,version=version+1,update_time=clock_timestamp() where user_id=? and subject_id=? and status='TODO' and deleted=0",target,uid,id);
+            jdbc.update("""
+                update study_copilot.t_task set subject_id=?,subject_name_snapshot=?,version=version+1,update_time=clock_timestamp()
+                where user_id=? and subject_id=? and deleted=0 and (status='TODO' or parent_id in
+                  (select id from study_copilot.t_task where user_id=? and subject_id=? and status='TODO' and deleted=0))
+                """,target,replacement.getName(),uid,id,uid,id);
             jdbc.update("update study_copilot.t_task_repeat_template set subject_id=?,version=version+1,update_time=clock_timestamp() where user_id=? and subject_id=? and status in ('ACTIVE','PAUSED') and deleted=0",target,uid,id);
         } else if("CANCEL".equals(request.getStrategy())) {
-            jdbc.update("update study_copilot.t_task set status='CANCELLED',cancelled_at=clock_timestamp(),version=version+1,update_time=clock_timestamp() where user_id=? and subject_id=? and status='TODO' and deleted=0",uid,id);
+            var pendingTasks=jdbc.queryForList("select id from study_copilot.t_task where user_id=? and subject_id=? and status='TODO' and deleted=0 order by parent_id nulls first,id",Long.class,uid,id);
+            for(long taskId:pendingTasks) {
+                var task=jdbc.queryForMap("select status,version from study_copilot.t_task where user_id=? and id=?",uid,taskId);
+                if("TODO".equals(task.get("status"))) tasks.state(taskId,"CANCELLED",java.util.Map.of("expectedVersion",task.get("version")));
+            }
             jdbc.update("update study_copilot.t_task_repeat_template set status='CANCELLED',version=version+1,update_time=clock_timestamp() where user_id=? and subject_id=? and status in ('ACTIVE','PAUSED') and deleted=0",uid,id);
         }
         jdbc.update("update study_copilot.t_subject set archived=1,version=version+1,update_time=clock_timestamp() where user_id=? and id=? and version=?",uid,id,current.getVersion());
@@ -98,7 +108,10 @@ public class SubjectServiceImpl implements SubjectService {
         return response(find(uid,id));
     }
     private long lockOwner() {
-        long uid=UserContext.requireUserId(); jdbc.queryForObject("select id from study_copilot.t_user where id=? for update",Long.class,uid); return uid;
+        long uid=UserContext.requireUserId();
+        if(jdbc.queryForList("select id from study_copilot.t_user where id=? and status=1 and deleted=0 for update",uid).isEmpty())
+            throw new BusinessException(ScErrorCode.TOKEN_REVOKED);
+        return uid;
     }
     private SubjectDO find(long uid,long id) {
         var matches=jdbc.query("select * from study_copilot.t_subject where user_id=? and id=?",this::row,uid,id);

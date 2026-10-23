@@ -57,6 +57,7 @@ public class JwtTokenProvider {
             Claims claims = Jwts.parserBuilder().requireIssuer(jwtProperties.getIssuer()).require("type", type)
                     .setSigningKey(getSigningKey()).build().parseClaimsJws(token).getBody();
             long userId = Long.parseLong(claims.getSubject());
+            if(type.equals("access") && Long.parseLong(claims.getId())<1) throw new IllegalArgumentException();
             Object number = claims.get(numericClaim);
             if (userId <= 0 || !(number instanceof Integer || number instanceof Long)
                     || ((Number) number).longValue() < (type.equals("refresh") ? 1 : 0)

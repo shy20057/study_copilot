@@ -5,6 +5,10 @@ spring:
     name: study-copilot-service
   main:
     allow-bean-definition-overriding: false
+  task:
+    scheduling:
+      pool:
+        size: 2
   datasource:
     url: ${SC_DB_URL}
     username: ${SC_DB_USER}
@@ -61,9 +65,14 @@ study-copilot:
   idempotency:
     hmac-secret: ${SC_IDEMPOTENCY_HMAC_SECRET}
   recovery-support-channel: ${SC_RECOVERY_SUPPORT_CHANNEL}
+  metrics-token: ${SC_METRICS_TOKEN:}
   redis-key-prefix: "${SC_REDIS_PREFIX:study-copilot:}"
+  focus:
+    scan-delay-ms: ${SC_FOCUS_SCAN_DELAY_MS:1000}
+  account-deletion:
+    scan-delay-ms: ${SC_ACCOUNT_DELETION_SCAN_DELAY_MS:30000}
   storage:
     endpoint: ${SC_MINIO_ENDPOINT:http://127.0.0.1:9000}
     bucket: ${SC_MINIO_BUCKET:study-copilot}
-    access-key: ${SC_MINIO_ACCESS_KEY}
-    secret-key: ${SC_MINIO_SECRET_KEY}
+    access-key: ${SC_MINIO_ACCESS_KEY:}
+    secret-key: ${SC_MINIO_SECRET_KEY:}

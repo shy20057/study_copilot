@@ -4,6 +4,7 @@ import com.example.studycopilot.dto.resp.onboarding.*;
 import java.time.LocalDate;
 import java.util.*;
 public interface OnboardingService {
+    java.util.Map<String,Object> planSummary();
     OnboardingProgress progress();
     OnboardingProgress save(SaveOnboardingProgressRequest request);
     List<TemplateCatalog.Definition> templates();

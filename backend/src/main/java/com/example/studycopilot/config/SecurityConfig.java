@@ -10,6 +10,7 @@ package com.example.studycopilot.config;
 
 import com.example.studycopilot.security.JwtAuthenticationFilter;
 import com.example.studycopilot.security.SecurityErrorHandler;
+import com.example.studycopilot.security.MetricsBearerAuthorization;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +35,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final SecurityErrorHandler securityErrorHandler;
+    private final MetricsBearerAuthorization metricsBearerAuthorization;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -44,6 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/prometheus").access(metricsBearerAuthorization)
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

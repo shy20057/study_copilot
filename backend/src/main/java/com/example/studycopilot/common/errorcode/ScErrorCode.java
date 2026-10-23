@@ -92,6 +92,11 @@ public enum ScErrorCode implements IErrorCode {
     // 通知
     NOTIFICATION_NOT_FOUND("SC_014001", "站内消息不存在"),
     TEMPLATE_RANGE_INVALID("SC_015001", "目标日期不足以容纳所选阶段，请选择较短模板或自行安排"),
+
+    // 私有头像
+    AVATAR_TYPE_INVALID("SC_016001", "请选择有效的 JPG、PNG 或 WebP 图片"),
+    AVATAR_TOO_LARGE("SC_016002", "头像大小不能超过 2MB"),
+    STORAGE_UNAVAILABLE("SC_016003", "头像存储暂不可用，请稍后重试"),
     ;
 
     private final String code;
@@ -100,6 +105,9 @@ public enum ScErrorCode implements IErrorCode {
     public HttpStatus httpStatus() {
         return switch (this) {
             case SYSTEM_ERROR, AI_SERVICE_UNAVAILABLE -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case STORAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case AVATAR_TYPE_INVALID -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+            case AVATAR_TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
             case VALIDATION_ERROR, MILESTONE_STATUS_INVALID, TASK_STATUS_INVALID,
                     POMODORO_STATUS_INVALID, POMODORO_DURATION_INVALID, PET_TYPE_INVALID,
                     TEMPLATE_RANGE_INVALID -> HttpStatus.BAD_REQUEST;
@@ -116,7 +124,8 @@ public enum ScErrorCode implements IErrorCode {
     }
 
     public boolean retryable() {
-        return httpStatus() == HttpStatus.INTERNAL_SERVER_ERROR || httpStatus() == HttpStatus.TOO_MANY_REQUESTS;
+        return httpStatus() == HttpStatus.INTERNAL_SERVER_ERROR || httpStatus() == HttpStatus.TOO_MANY_REQUESTS
+                || httpStatus() == HttpStatus.SERVICE_UNAVAILABLE;
     }
 
     public static ScErrorCode fromCode(String code, ScErrorCode fallback) {

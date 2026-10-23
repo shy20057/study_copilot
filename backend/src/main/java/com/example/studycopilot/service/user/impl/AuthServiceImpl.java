@@ -20,6 +20,7 @@ import com.example.studycopilot.common.exception.BusinessException;
 import com.example.studycopilot.security.JwtProperties;
 import com.example.studycopilot.security.IdempotencyProperties;
 import com.example.studycopilot.security.JwtTokenProvider;
+import com.example.studycopilot.security.LoginAttemptGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProperties properties;
     private final IdempotencyProperties idempotency;
     private final ObjectMapper json;
+    private final LoginAttemptGuard loginGuard;
 
     // Valid BCrypt hash used for absent users, keeping password work on both login branches.
     private static final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -57,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse register(RegisterRequest request, String requestId) {
         String name = normalize(request.getUsername());
-        if (name.isBlank() || name.codePointCount(0, name.length()) > 50 || !ValidPassword.Validator.valid(request.getPassword())
+        if (!name.matches("[a-z0-9_]{4,30}") || !ValidPassword.Validator.valid(request.getPassword())
                 || requestId == null || requestId.isBlank() || requestId.length() > 100) {
             throw new BusinessException(ScErrorCode.VALIDATION_ERROR);
         }
@@ -86,8 +88,9 @@ public class AuthServiceImpl implements AuthService {
             }
             long userId = ((Number) inserted.get(0).get("id")).longValue();
             long subjectId = jdbc.queryForObject("""
-                    insert into study_copilot.t_subject(user_id,name,color) values (?,'默认科目','#7C8CF8') returning id
+                    insert into study_copilot.t_subject(user_id,name,color,sort_order) values (?,'高数','#2F6F89',0) returning id
                     """, Long.class, userId);
+            jdbc.update("insert into study_copilot.t_subject(user_id,name,color,sort_order) values (?,'英语','#4D8CA4',1),(?,'政治','#789F8E',2),(?,'专业课','#9B8BB4',3)",userId,userId,userId);
             jdbc.update("insert into study_copilot.t_user_setting(user_id,default_subject_id) values (?,?)", userId, subjectId);
             jdbc.update("""
                     insert into study_copilot.t_learning_day_rule(user_id,version,timezone,day_start_hour,effective_at)
@@ -107,7 +110,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        return transactions.execute(status -> {
+        String reservation = loginGuard.begin(request.getUsername());
+        LoginResponse result = transactions.execute(status -> {
             var found = jdbc.queryForList("select * from study_copilot.t_user where normalized_username=? for update", normalize(request.getUsername()));
             Map<String, Object> user = found.isEmpty() ? null : found.get(0);
             boolean matches = passwords.matches(ValidPassword.Validator.valid(request.getPassword()) ? request.getPassword() : "invalid-password",
@@ -115,8 +119,11 @@ public class AuthServiceImpl implements AuthService {
             if (user == null || !active(user) || !ValidPassword.Validator.valid(request.getPassword()) || !matches)
                 throw new BusinessException(ScErrorCode.USER_PASSWORD_ERROR);
             long userId = number(user, "id");
+            jdbc.update("update study_copilot.t_user set last_seen_at=clock_timestamp() where id=?",userId);
             return response(newSession(userId, (String) user.get("username"), number(user, "session_version"), nextRoute(userId)));
         });
+        loginGuard.succeeded(reservation);
+        return result;
     }
 
     @Override
@@ -216,6 +223,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String nextRoute(long userId) {
+        if(Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from study_copilot.t_focus_session where user_id=? and status='RUNNING' and deleted=0)",Boolean.class,userId)))
+            return "/focus";
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 select exists(select 1 from study_copilot.t_onboarding_progress
                 where user_id=? and status in ('COMPLETED','SKIPPED'))

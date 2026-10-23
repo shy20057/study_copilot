@@ -30,6 +30,9 @@ public class UserSettingDO {
     private Boolean reduceTransparency;
     private Long defaultSubjectId;
     private Long version;
+    private Boolean partialRewardsEnabled;
+    private Boolean soundEnabled;
+    private Boolean animationsEnabled;
 
     @TableId(type = IdType.AUTO)
     private Long id;

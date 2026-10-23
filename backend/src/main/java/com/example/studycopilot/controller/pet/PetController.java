@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 萌宠接口控制器。
  */
@@ -31,9 +34,9 @@ public class PetController {
 
     @GetMapping("/options")
     public Result<?> options() {
-        return Result.success(java.util.List.of(
-            java.util.Map.of("id",1,"name","粉粉喵"),java.util.Map.of("id",2,"name","汪汪柴"),
-            java.util.Map.of("id",3,"name","软软兔"),java.util.Map.of("id",4,"name","熊熊帕"),java.util.Map.of("id",5,"name","啾啾鸡")));
+        return Result.success(List.of(
+            Map.of("id",1,"name","粉粉喵"),Map.of("id",2,"name","汪汪柴"),
+            Map.of("id",3,"name","软软兔"),Map.of("id",4,"name","熊熊帕"),Map.of("id",5,"name","啾啾鸡")));
     }
 
     @GetMapping("/status")

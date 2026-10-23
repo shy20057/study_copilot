@@ -13,6 +13,7 @@ import com.example.studycopilot.common.exception.*;
 import com.example.studycopilot.common.result.FieldViolation;
 import com.example.studycopilot.common.result.Result;
 import com.example.studycopilot.support.trace.TraceIdFilter;
+import com.example.studycopilot.support.metrics.ApiMetricsFilter;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -67,6 +70,10 @@ public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
             result.setCurrentVersion(business.getCurrentVersion());
             result.setCurrentSession(business.getCurrentSession());
         }
+        if(ex instanceof RateLimitException limited) {
+            result.setRetryAfterSeconds(limited.getRetryAfterSeconds());
+            return ResponseEntity.status(code.httpStatus()).header("Retry-After",Long.toString(limited.getRetryAfterSeconds())).body(result);
+        }
         return ResponseEntity.status(code.httpStatus()).body(result);
     }
 
@@ -80,6 +87,16 @@ public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Result<Void>> missingParameter(MissingServletRequestParameterException ex) {
         return validation(List.of(new FieldViolation(ex.getParameterName(), "缺少必填参数")));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Result<Void>> missingPart(MissingServletRequestPartException ex) {
+        return validation(List.of(new FieldViolation(ex.getRequestPartName(), "缺少必填参数")));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Result<Void>> oversizedUpload(MaxUploadSizeExceededException ex) {
+        return error(ScErrorCode.AVATAR_TOO_LARGE);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -154,6 +171,9 @@ public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
             ServerHttpResponse response) {
         if (body instanceof Result<?> result && request instanceof ServletServerHttpRequest servletRequest) {
             result.setTraceId((String) servletRequest.getServletRequest().getAttribute(TraceIdFilter.ATTRIBUTE));
+            if (!result.isSuccess()) {
+                servletRequest.getServletRequest().setAttribute(ApiMetricsFilter.ERROR_ATTRIBUTE, result.getCode());
+            }
         }
         return body;
     }

@@ -34,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final JdbcTemplate jdbc;
+    private final SecurityErrorHandler errors;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -45,19 +46,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 Long version = ((Number) claims.get("sessionVersion")).longValue();
                 boolean active = Boolean.TRUE.equals(jdbc.queryForObject("""
-                        select exists(select 1 from study_copilot.t_user
-                        where id=? and status=1 and deleted=0 and session_version=?)
-                        """, Boolean.class, userId, version));
+                        select exists(select 1 from study_copilot.t_user u
+                          join study_copilot.t_refresh_session s on s.user_id=u.id and s.id=?
+                        where u.id=? and u.status=1 and u.deleted=0 and u.session_version=?
+                          and s.revoked_at is null and s.expires_at>now() and s.session_version=u.session_version)
+                        """, Boolean.class, Long.parseLong(claims.getId()), userId, version));
                 if (!active) {
                     SecurityContextHolder.clearContext();
                     filterChain.doFilter(request, response);
                     return;
                 }
+                jdbc.update("update study_copilot.t_user set last_seen_at=clock_timestamp() where id=? and status=1 and deleted=0 and (last_seen_at is null or last_seen_at<clock_timestamp()-interval '1 minute')",userId);
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (BusinessException ex) {
                 SecurityContextHolder.clearContext();
+            } catch (org.springframework.dao.DataAccessException ex) {
+                SecurityContextHolder.clearContext();
+                errors.unavailable(request,response);
+                return;
             }
         }
         filterChain.doFilter(request, response);
