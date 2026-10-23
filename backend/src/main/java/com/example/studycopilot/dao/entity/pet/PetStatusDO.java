@@ -35,7 +35,7 @@ public class PetStatusDO {
     private Integer level;
 
     /** 历史累计经验值 */
-    private Integer totalExp;
+    private Long totalExp;
 
     /** 更新时间 */
     private Instant updateTime;

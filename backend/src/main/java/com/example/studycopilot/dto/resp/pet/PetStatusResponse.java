@@ -18,7 +18,9 @@ public class PetStatusResponse {
 
     private Integer petType;
     private Integer level;
-    private Integer totalExp;
+    private Long totalExp;
+    private Long currentLevelExp;
+    private Boolean maxLevel;
     private Integer nextLevelExp;
     private String stage;
 }

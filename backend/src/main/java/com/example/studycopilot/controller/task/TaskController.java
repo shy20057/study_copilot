@@ -32,6 +32,7 @@ import java.util.List;
 /**
  * 任务接口控制器。
  */
+@org.springframework.context.annotation.Profile("legacy-api")
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor

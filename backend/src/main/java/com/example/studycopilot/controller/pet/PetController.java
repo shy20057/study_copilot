@@ -29,6 +29,13 @@ public class PetController {
 
     private final PetService petService;
 
+    @GetMapping("/options")
+    public Result<?> options() {
+        return Result.success(java.util.List.of(
+            java.util.Map.of("id",1,"name","粉粉喵"),java.util.Map.of("id",2,"name","汪汪柴"),
+            java.util.Map.of("id",3,"name","软软兔"),java.util.Map.of("id",4,"name","熊熊帕"),java.util.Map.of("id",5,"name","啾啾鸡")));
+    }
+
     @GetMapping("/status")
     public Result<PetStatusResponse> status() {
         return Result.success(petService.status());

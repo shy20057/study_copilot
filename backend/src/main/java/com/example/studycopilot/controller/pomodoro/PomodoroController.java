@@ -30,6 +30,7 @@ import java.util.List;
 /**
  * 番茄钟接口控制器。
  */
+@org.springframework.context.annotation.Profile("legacy-api")
 @RestController
 @RequestMapping("/api/pomodoro")
 @RequiredArgsConstructor

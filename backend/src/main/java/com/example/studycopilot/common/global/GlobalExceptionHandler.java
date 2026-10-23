@@ -88,7 +88,8 @@ public class GlobalExceptionHandler implements ResponseBodyAdvice<Object> {
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, ConstraintViolationException.class,
-            HandlerMethodValidationException.class})
+            HandlerMethodValidationException.class, IllegalArgumentException.class,
+            org.springframework.web.bind.MissingRequestHeaderException.class})
     public ResponseEntity<Result<Void>> invalidRequest(Exception ex) {
         return validation(List.of());
     }
