@@ -89,6 +89,7 @@ Known functional gaps in the Task 6–11 code, recorded in `docs/demo-backend-de
 - Repeat template edits only affect future instances; cancelling a parent task does not restore child task states on undo; delete-undo metadata is a simplified implementation.
 - Login has no progressive rate limiting. Operational metrics, backup/restore drills are absent.
 - The `dto/resp/notification` package is an empty directory.
+- `GET`/`POST /api/pomodoro` is a dead skeleton from before Task 8. `PomodoroServiceImpl` has six methods that are all TODO placeholders returning null, and unlike the legacy task controller it carries no profile, so it **is registered in the default profile**. `/api/focus` supersedes it. Parking it behind `legacy-api`, the profile `TaskController` already uses, would match how the other superseded controller was handled.
 
 ## How to run things
 

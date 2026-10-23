@@ -19,6 +19,8 @@
 ## 最小接入约定
 所有请求除 auth 外带 Authorization: Bearer <accessToken>。关键写入带 Idempotency-Key；已有资源写入传 expectedVersion。
 
+下列接口是**本批（Task 6–11）新增**的部分，不是全部路由。Task 1–5 的接口（`/api/auth`、`/api/settings`、`/api/subjects`、`/api/onboarding`、`/api/templates`、`/api/account`）见各自 controller。旧番茄钟 `/api/pomodoro` 不在其中，且当前不可用。
+
 - GET/POST /api/tasks；PUT/DELETE /api/tasks/{id}；POST /{id}/complete、reopen、cancel、restore；PUT /api/tasks/reorder。
 - 创建任务：{"title":"复习一章","subjectId":1,"targetDate":"2026-10-23","plannedPomodoros":1}。
 - 排序：{"targetDate":"2026-10-23","status":"ALL","items":[{"id":1,"expectedVersion":0}]}，可带 parentId。
@@ -42,9 +44,10 @@ V1–V4 保持原样，新增 V5__data_version.sql 将由 Flyway 在应用启动
 
 ## 本次停止位置
 这是最小后端 Demo 代码交付，不是一期全部验收。以下明确未完成：
-- 头像上传仍为原始占位服务；账户注销/数据清理未实现。
+- 头像上传仍为原始占位服务（`/api/upload` 返回 null）；账户注销/数据清理未实现。
 - 登录渐进限流、完整运维指标、备份恢复演练未实现。
 - 重复模板当前编辑仅作用后续实例；取消父任务后恢复不恢复子任务原状态；删除撤销元数据为简化实现。
 - 新增计时、任务、统计模块未做运行/并发验证；早期测试不代表它们已验证。
+- `/api/pomodoro` 是 Task 8 之前的旧番茄钟骨架，**默认 profile 下仍然注册**，但 `PomodoroServiceImpl` 六个方法全是 TODO 占位、恒返回 null。它已被 `/api/focus` 取代，前端不要调用；建议按 `TaskController` 的做法挂到 `legacy-api` profile 下。
 - 前端尚未编写；开始前仍需使用 UI skills 与用户确认设计。
 
